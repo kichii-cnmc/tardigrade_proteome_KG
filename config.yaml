@@ -1,0 +1,9 @@
+
+genome_targets:
+  - organism: "Ramazzottius varieornatus"
+    source: "UniProt"
+    id: "947166"  # taxonomic ID - if this doesn't work, try "42241" or search for organism name directly
+  - organism: "Ramazzottius varieornatus"
+    source: "NCBI"
+    id: "GCF_001322645.1"
+
