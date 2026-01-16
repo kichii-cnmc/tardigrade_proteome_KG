@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # This scripts downloads genome FASTA files for target organisms specified in config.yaml 
+echo "Downloading genome FASTA files for target organisms..."
 
 # Parse command line arguments for testing flag
 TEST_MODE=false
@@ -35,7 +36,7 @@ rm -r data/rv_ncbi data/rv_ncbi.zip
 
 # Stop here if testing flag is set
 if [ "$TEST_MODE" = true ]; then
-    echo "Test Mode - stopping early"
+    echo "Test Mode - Stopping Early"
     exit 0
 fi
 
