@@ -68,7 +68,6 @@ def cluster_sequences(input_fasta, output_tsv, identity_threshold=1.0):
     identity_threshold (float): Sequence identity threshold for clustering (default is 1.0).
     """
     # Run CD-HIT
-
     res = cd_hit(
     i=input_fasta,
     o="temp.fasta",
