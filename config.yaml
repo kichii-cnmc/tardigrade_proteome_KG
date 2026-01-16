@@ -1,9 +1,9 @@
 
 genome_targets:
-  - organism: "Ramazzottius varieornatus"
-    source: "UniProt"
-    id: "947166"  # taxonomic ID - if this doesn't work, try "42241" or search for organism name directly
-  - organism: "Ramazzottius varieornatus"
-    source: "NCBI"
-    id: "GCF_001322645.1"
+  {organism: "Ramazzottius varieornatus",
+   source: "UniProt",
+   url: "https://rest.uniprot.org/uniprotkb/stream?compressed=true&format=fasta&query=taxonomy_id:947166"}
+  {organism: "Ramazzottius varieornatus",
+   source: "NCBI",
+   url: "https://api.ncbi.nlm.nih.gov/datasets/v2/genome/accession/GCA_001949185.1/download?include_annotation_type=PROT_FASTA"}
 
