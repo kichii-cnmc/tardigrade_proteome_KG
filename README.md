@@ -1,6 +1,7 @@
 # tardigrade_proteome_KG
 Used to build knowledge graphs for the classification and identification of proteins within the tardigrade proteome.
 
+```
 my-kg-project/
 ├── data/                   # Local raw data samples (gitignored)
 │   ├── raw/                # Holds raw fasta files downloaded
@@ -18,3 +19,4 @@ my-kg-project/
 ├── tests/                  # Unit and integration tests
 ├── environment.yaml        # Python dependencies
 └── README.md               # Documentation
+```
