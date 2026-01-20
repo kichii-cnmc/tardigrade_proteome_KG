@@ -1,6 +1,5 @@
-# functions used to build knowledge graph from protein info tsv files
+# helper functions used to build knowledge graph from protein info tsv files
 import pandas as pd
-
 
 def load_protein_info(file_path):
     """Load protein info from TSV file into a pandas DataFrame."""
