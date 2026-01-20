@@ -37,3 +37,10 @@ echo "Merging of FASTA files completed."
 echo
 
 # run the protein info pull script on each merged file
+if [[ -f "data/2_merged/merged_RV.tsv" ]]; then
+    python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_RV.tsv data/3_organized/protein_info_RV.tsv --method batch
+fi
+
+if [[ -f "data/2_merged/merged_HE.tsv" ]]; then
+    python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_HE.tsv data/3_organized/protein_info_HE.tsv --method batch
+fi

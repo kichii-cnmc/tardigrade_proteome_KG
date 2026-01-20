@@ -1,214 +1,404 @@
-# call the UniProt API to pull GO terms, Pfam domains, KEGG pathways, PROSITE annotations, PDB/AF structure ID
-import requests
+"""
+UniProt Protein Information Fetcher
+
+This script fetches protein information from the UniProt API including:
+- GO terms (molecular function, cellular component, biological process)
+- Pfam domains
+- KEGG pathways
+- PROSITE annotations
+- PDB/AlphaFold structure IDs
+- Gene sequences
+
+Supports multiple processing methods: async, batch, and sequential.
+"""
+
+import asyncio
 import argparse
 import time
-import asyncio
-import aiohttp
-from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, List, Optional, Set, Tuple, Any
 import sys
+
+import aiohttp
+import requests
 from tqdm import tqdm
 
-async def fetch_uniprot_info_async(session, uniprot_id, semaphore, max_retries=3):
+# Constants
+UNIPROT_BASE_URL = "https://rest.uniprot.org/uniprotkb"
+UNIPROT_SEARCH_URL = f"{UNIPROT_BASE_URL}/search"
+UNIPROT_FIELDS = "accession,sequence,go_p,go_c,go_f,go_id,xref_pfam,xref_kegg,xref_prosite,xref_alphafolddb,xref_pdb,xref_geneid"
+
+# Processing parameters
+DEFAULT_MAX_CONCURRENT = 10
+DEFAULT_BATCH_SIZE = 25
+MAX_BATCH_SIZE = 50
+DEFAULT_TIMEOUT = 30
+BATCH_REQUEST_TIMEOUT = 60
+API_DELAY = 0.1
+MAX_PDB_STRUCTURES = 5
+MAX_RETRIES = 3
+
+# Output column headers
+OUTPUT_HEADERS = [
+    "UniProt_ID", "NCBI_ID", "Sequence", "GeneID", "GO_mf", "GO_cc", "GO_bp",
+    "Pfam_domains", "KEGG_pathways", "PROSITE_annotations", 
+    "PDB_structures", "AF_structures"
+]
+
+async def fetch_uniprot_info_async(
+    session: aiohttp.ClientSession, 
+    uniprot_id: str, 
+    semaphore: asyncio.Semaphore, 
+    max_retries: int = MAX_RETRIES
+) -> Optional[Dict[str, Any]]:
     """
     Asynchronously fetches protein information from the UniProt API.
+    
+    Args:
+        session: aiohttp client session
+        uniprot_id: UniProt accession ID
+        semaphore: Concurrency limiter
+        max_retries: Maximum number of retry attempts
+        
+    Returns:
+        Parsed protein information dictionary or None if failed
     """
-    params = {
-        "fields": "sequence,go_p,go_c,go,go_f,go_id,xref_pfam,xref_kegg,xref_prosite,xref_alphafolddb,xref_pdb,xref_geneid"
-    }
-
-    base_url = f"https://rest.uniprot.org/uniprotkb/{uniprot_id}.json"
+    params = {"fields": UNIPROT_FIELDS}
+    base_url = f"{UNIPROT_BASE_URL}/{uniprot_id}.json"
     
     async with semaphore:  # Limit concurrent requests
         for attempt in range(max_retries):
             try:
-                async with session.get(base_url, params=params, timeout=30) as response:
+                timeout = aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT)
+                async with session.get(base_url, params=params, timeout=timeout) as response:
                     if response.status == 200:
                         data = await response.json()
                         return parse_uniprot_data(data, uniprot_id)
                     elif response.status == 429:  # Rate limited
-                        await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                        wait_time = 2 ** attempt  # Exponential backoff
+                        print(f"Rate limited for {uniprot_id}, waiting {wait_time}s...")
+                        await asyncio.sleep(wait_time)
                         continue
                     else:
                         if attempt == max_retries - 1:
-                            print(f"Failed to fetch data for {uniprot_id}: {response.status}")
+                            print(f"Failed to fetch data for {uniprot_id}: HTTP {response.status}")
                         continue
             except asyncio.TimeoutError:
                 if attempt == max_retries - 1:
-                    print(f"Timeout for {uniprot_id}")
+                    print(f"Timeout after {DEFAULT_TIMEOUT}s for {uniprot_id}")
                 await asyncio.sleep(1)
             except Exception as e:
                 if attempt == max_retries - 1:
-                    print(f"Error for {uniprot_id}: {e}")
+                    print(f"Unexpected error for {uniprot_id}: {type(e).__name__}: {e}")
                 await asyncio.sleep(1)
     
     return None
 
-def fetch_uniprot_batch(uniprot_ids_batch):
+def fetch_uniprot_batch(uniprot_ids_batch: List[str]) -> Dict[str, Dict[str, Any]]:
     """
     Fetches multiple proteins at once using UniProt's batch API.
+    
+    Args:
+        uniprot_ids_batch: List of UniProt IDs to fetch
+        
+    Returns:
+        Dictionary mapping UniProt IDs to their parsed information
     """
     if not uniprot_ids_batch:
         return {}
     
     # Limit batch size to avoid 400 errors
-    if len(uniprot_ids_batch) > 50:
-        uniprot_ids_batch = uniprot_ids_batch[:50]
+    if len(uniprot_ids_batch) > MAX_BATCH_SIZE:
+        uniprot_ids_batch = uniprot_ids_batch[:MAX_BATCH_SIZE]
+        print(f"Warning: Batch size limited to {MAX_BATCH_SIZE} entries")
     
-    # Use the correct UniProt API endpoint for batch queries
+    # Build query string for batch request
     ids_str = " OR ".join([f"accession:{uid}" for uid in uniprot_ids_batch])
     params = {
         "query": ids_str,
-        "fields": "accession,sequence,go_p,go_c,go_f,go_id,xref_pfam,xref_kegg,xref_prosite,xref_alphafolddb,xref_pdb,xref_geneid",
+        "fields": UNIPROT_FIELDS,
         "format": "json",
         "size": len(uniprot_ids_batch)
     }
     
-    url = "https://rest.uniprot.org/uniprotkb/search"
-    
     try:
-        response = requests.get(url, params=params, timeout=60)
+        response = requests.get(UNIPROT_SEARCH_URL, params=params, timeout=BATCH_REQUEST_TIMEOUT)
+        
         if response.status_code == 200:
             data = response.json()
             results = {}
+            
             for entry in data.get('results', []):
                 uniprot_id = entry.get('primaryAccession', '')
                 if uniprot_id:
                     results[uniprot_id] = parse_uniprot_data(entry, uniprot_id)
+                    
+            print(f"Successfully fetched {len(results)}/{len(uniprot_ids_batch)} proteins in batch")
             return results
+            
         else:
-            print(f"Batch request failed: {response.status_code}")
+            print(f"Batch request failed: HTTP {response.status_code}")
             if response.status_code == 400:
-                print(f"Bad request - possibly too many IDs. Query: {ids_str[:200]}...")
+                print(f"Bad request - query may be too complex. Query length: {len(ids_str)} chars")
+            elif response.status_code == 429:
+                print("Rate limited - consider reducing batch size or adding delays")
             return {}
+            
+    except requests.exceptions.Timeout:
+        print(f"Batch request timed out after {BATCH_REQUEST_TIMEOUT}s")
+        return {}
     except Exception as e:
-        print(f"Batch request error: {e}")
+        print(f"Batch request error: {type(e).__name__}: {e}")
         return {}
 
-def parse_uniprot_data(data, uniprot_id):
+def create_empty_protein_info() -> Dict[str, Any]:
     """
-    Parses UniProt JSON data to extract relevant information.
+    Creates an empty protein information dictionary with all expected fields.
+    
+    Returns:
+        Dictionary with empty sets for all annotation fields and empty string for sequence
     """
-    info = {
+    return {
         "GeneID": set(),
-        "GO_mf": set(),
-        "GO_cc": set(),
-        "GO_bp": set(),
+        "GO_mf": set(),  # Gene Ontology - Molecular Function
+        "GO_cc": set(),  # Gene Ontology - Cellular Component  
+        "GO_bp": set(),  # Gene Ontology - Biological Process
         "Pfam_domains": set(),
         "KEGG_pathways": set(),
         "PROSITE_annotations": set(),
         "PDB_structures": set(),
-        "AF_structures": set(),
+        "AF_structures": set(),  # AlphaFold structures
         "Sequence": ""
     }
+
+
+def parse_uniprot_data(data: Dict[str, Any], uniprot_id: str) -> Dict[str, Any]:
+    """
+    Parses UniProt JSON data to extract relevant information.
     
-    # Extract cross-references
+    Args:
+        data: UniProt JSON response data
+        uniprot_id: UniProt accession ID for error reporting
+        
+    Returns:
+        Dictionary containing parsed protein information
+    """
+    info = create_empty_protein_info()
+    
+    # Extract cross-references and sequence
+    _parse_cross_references(data, info)
+    _parse_sequence(data, info)
+    
+    # Convert sets to lists (except Sequence which remains a string)
+    for key, value in info.items():
+        if key != "Sequence" and isinstance(value, set):
+            info[key] = list(value)
+            
+    return info
+
+
+def _parse_cross_references(data: Dict[str, Any], info: Dict[str, Any]) -> None:
+    """
+    Parse cross-references from UniProt data.
+    
+    Args:
+        data: UniProt JSON response data
+        info: Protein information dictionary to populate
+    """
     if 'uniProtKBCrossReferences' in data:
         for db_ref in data['uniProtKBCrossReferences']:
             db_type = db_ref.get('database', '')
+            ref_id = db_ref.get('id', '')
+            
+            if not ref_id:
+                continue
+                
             if db_type == 'GeneID':
-                info["GeneID"].add(db_ref['id'])
+                info["GeneID"].add(ref_id)
+                
             elif db_type == 'GO':
-                GO_number = db_ref['id']
-                GO_phrase = db_ref.get('properties', [])[0]['value'] if db_ref.get('properties') else ''
-                if GO_phrase and GO_phrase[0] == 'F':
-                    info["GO_mf"].add(GO_number + " - " + GO_phrase)
-                elif GO_phrase and GO_phrase[0] == 'C':
-                    info["GO_cc"].add(GO_number + " - " + GO_phrase)
-                elif GO_phrase and GO_phrase[0] == 'P':
-                    info["GO_bp"].add(GO_number + " - " + GO_phrase)
+                _parse_go_term(db_ref, info)
+                
             elif db_type == 'Pfam':
-                info["Pfam_domains"].add(db_ref['id'])
+                info["Pfam_domains"].add(ref_id)
+                
             elif db_type == 'KEGG':
-                info["KEGG_pathways"].add(db_ref['id'])
+                info["KEGG_pathways"].add(ref_id)
+                
             elif db_type == 'PROSITE':
-                info["PROSITE_annotations"].add(db_ref['id'])
+                info["PROSITE_annotations"].add(ref_id)
+                
             elif db_type == 'PDB':
-                info["PDB_structures"].add(db_ref['id'])
+                info["PDB_structures"].add(ref_id)
+                
             elif db_type == 'AlphaFoldDB':
-                info["AF_structures"].add(db_ref['id'])
+                info["AF_structures"].add(ref_id)
+
+
+def _parse_go_term(db_ref: Dict[str, Any], info: Dict[str, Any]) -> None:
+    """
+    Parse GO term and classify into molecular function, cellular component, or biological process.
     
-    # Extract sequence
+    Args:
+        db_ref: Database reference dictionary containing GO information
+        info: Protein information dictionary to populate
+    """
+    go_id = db_ref.get('id', '')
+    properties = db_ref.get('properties', [])
+    
+    if not properties:
+        return
+        
+    go_description = properties[0].get('value', '')
+    
+    if not go_description:
+        return
+        
+    # Classify GO term by first character of description
+    go_entry = f"{go_id} - {go_description}"
+    
+    if go_description.startswith('F:'):
+        info["GO_mf"].add(go_entry)  # Molecular Function
+    elif go_description.startswith('C:'):
+        info["GO_cc"].add(go_entry)  # Cellular Component
+    elif go_description.startswith('P:'):
+        info["GO_bp"].add(go_entry)  # Biological Process
+
+
+def _parse_sequence(data: Dict[str, Any], info: Dict[str, Any]) -> None:
+    """
+    Parse protein sequence from UniProt data.
+    
+    Args:
+        data: UniProt JSON response data
+        info: Protein information dictionary to populate
+    """
     if 'sequence' in data and 'value' in data['sequence']:
         info["Sequence"] = data['sequence']['value']
 
-    # Convert sets to lists (except Sequence which should remain a string)
-    for key in info:
-        if key != "Sequence" and isinstance(info[key], set):
-            info[key] = list(info[key])
-    return info
-
-def fetch_uniprot_info(uniprot_id):
+def fetch_uniprot_info(uniprot_id: str) -> Optional[Dict[str, Any]]:
     """
     Synchronous fallback function for fetching protein information.
+    
+    Args:
+        uniprot_id: UniProt accession ID
+        
+    Returns:
+        Parsed protein information dictionary or None if failed
     """
-    params = {
-        "fields": "sequence,go_p,go_c,go,go_f,go_id,xref_pfam,xref_kegg,xref_prosite,xref_alphafolddb,xref_pdb,xref_geneid"
-    }
-
-    base_url = f"https://rest.uniprot.org/uniprotkb/{uniprot_id}.json"
+    params = {"fields": UNIPROT_FIELDS}
+    url = f"{UNIPROT_BASE_URL}/{uniprot_id}.json"
     
     try:
-        response = requests.get(base_url, params=params, timeout=30)
+        response = requests.get(url, params=params, timeout=DEFAULT_TIMEOUT)
+        
         if response.status_code == 200:
             data = response.json()
             return parse_uniprot_data(data, uniprot_id)
         else:
-            print(f"Failed to fetch data for {uniprot_id}: {response.status_code}")
+            print(f"Failed to fetch data for {uniprot_id}: HTTP {response.status_code}")
             return None
+            
+    except requests.exceptions.Timeout:
+        print(f"Timeout after {DEFAULT_TIMEOUT}s for {uniprot_id}")
+        return None
     except Exception as e:
-        print(f"Error for {uniprot_id}: {e}")
+        print(f"Error fetching {uniprot_id}: {type(e).__name__}: {e}")
         return None
 
-async def process_proteins_async(uniprot_ids, ncbi_ids, output_tsv, max_concurrent=10):
+
+def format_protein_row(uniprot_id: str, ncbi_id: str, info: Optional[Dict[str, Any]]) -> List[str]:
+    """
+    Formats protein information into a TSV row.
+    
+    Args:
+        uniprot_id: UniProt accession ID
+        ncbi_id: NCBI ID
+        info: Protein information dictionary or None for failed fetches
+        
+    Returns:
+        List of strings representing a TSV row
+    """
+    if info is None:
+        # Return empty row for failed requests
+        return [uniprot_id, ncbi_id] + [""] * (len(OUTPUT_HEADERS) - 2)
+    
+    return [
+        uniprot_id,
+        ncbi_id,
+        info.get("Sequence", ""),
+        ";".join(info.get("GeneID", [])),
+        ";".join(info.get("GO_mf", [])),
+        ";".join(info.get("GO_cc", [])),
+        ";".join(info.get("GO_bp", [])),
+        ";".join(info.get("Pfam_domains", [])),
+        ";".join(info.get("KEGG_pathways", [])),
+        ";".join(info.get("PROSITE_annotations", [])),
+        ";".join(info.get("PDB_structures", [])[:MAX_PDB_STRUCTURES]),
+        ";".join(info.get("AF_structures", []))
+    ]
+
+async def process_proteins_async(
+    uniprot_ids: List[str], 
+    ncbi_ids: List[str], 
+    output_tsv: str, 
+    max_concurrent: int = DEFAULT_MAX_CONCURRENT
+) -> None:
     """
     Process proteins asynchronously with controlled concurrency.
+    
+    Args:
+        uniprot_ids: List of UniProt IDs to process
+        ncbi_ids: List of corresponding NCBI IDs  
+        output_tsv: Output file path
+        max_concurrent: Maximum number of concurrent requests
     """
     semaphore = asyncio.Semaphore(max_concurrent)
     
     async with aiohttp.ClientSession() as session:
-        tasks = []
-        for uniprot_id in uniprot_ids:
-            task = fetch_uniprot_info_async(session, uniprot_id, semaphore)
-            tasks.append(task)
+        # Create tasks for all proteins
+        tasks = [
+            fetch_uniprot_info_async(session, uniprot_id, semaphore)
+            for uniprot_id in uniprot_ids
+        ]
         
         with open(output_tsv, 'w') as out_f:
-            header = ["UniProt_ID", "NCBI_ID", "Sequence", "GeneID", "GO_mf", "GO_cc", "GO_bp", "Pfam_domains", "KEGG_pathways", "PROSITE_annotations", "PDB_structures", "AF_structures"]
-            out_f.write('\t'.join(header) + '\n')
+            # Write header
+            out_f.write('\t'.join(OUTPUT_HEADERS) + '\n')
             
             # Process results as they complete
-            for i, task in enumerate(tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Processing proteins")):
+            completed_tasks = tqdm(
+                asyncio.as_completed(tasks), 
+                total=len(tasks), 
+                desc="Processing proteins"
+            )
+            
+            for i, task in enumerate(completed_tasks):
                 info = await task
                 uniprot_id = uniprot_ids[i]
                 ncbi_id = ncbi_ids[i] if i < len(ncbi_ids) else ""
                 
-                if info is None:
-                    # Write empty row for failed requests
-                    row = [uniprot_id, ncbi_id, "", "", "", "", "", "", "", "", "", ""]
-                else:
-                    row = [
-                        uniprot_id,
-                        ncbi_id,
-                        info["Sequence"],
-                        ';'.join(info["GeneID"]),
-                        ';'.join(info["GO_mf"]),
-                        ';'.join(info["GO_cc"]),
-                        ';'.join(info["GO_bp"]),
-                        ';'.join(info["Pfam_domains"]),
-                        ';'.join(info["KEGG_pathways"]),
-                        ';'.join(info["PROSITE_annotations"]),
-                        ';'.join(info["PDB_structures"][:5]),  # Limit to first 5 PDB structures
-                        ';'.join(info["AF_structures"])
-                    ]
+                row = format_protein_row(uniprot_id, ncbi_id, info)
                 out_f.write('\t'.join(row) + '\n')
 
-def process_proteins_batch(uniprot_ids, ncbi_ids, output_tsv, batch_size=25):
+def process_proteins_batch(
+    uniprot_ids: List[str], 
+    ncbi_ids: List[str], 
+    output_tsv: str, 
+    batch_size: int = DEFAULT_BATCH_SIZE
+) -> None:
     """
     Process proteins in batches using UniProt's batch API.
     Uses smaller batch sizes to avoid API 400 errors.
+    
+    Args:
+        uniprot_ids: List of UniProt IDs to process
+        ncbi_ids: List of corresponding NCBI IDs
+        output_tsv: Output file path
+        batch_size: Number of proteins to process in each batch
     """
     with open(output_tsv, 'w') as out_f:
-        header = ["UniProt_ID", "NCBI_ID", "Sequence", "GeneID", "GO_mf", "GO_cc", "GO_bp", "Pfam_domains", "KEGG_pathways", "PROSITE_annotations", "PDB_structures", "AF_structures"]
-        out_f.write('\t'.join(header) + '\n')
+        # Write header
+        out_f.write('\t'.join(OUTPUT_HEADERS) + '\n')
         
         total_batches = (len(uniprot_ids) + batch_size - 1) // batch_size
         
@@ -219,60 +409,31 @@ def process_proteins_batch(uniprot_ids, ncbi_ids, output_tsv, batch_size=25):
             # Fetch batch data
             batch_results = fetch_uniprot_batch(batch_uniprot_ids)
             
-            # Write results
+            # Process each protein in the batch
             for j, uniprot_id in enumerate(batch_uniprot_ids):
                 ncbi_id = batch_ncbi_ids[j] if j < len(batch_ncbi_ids) else ""
                 info = batch_results.get(uniprot_id)
                 
+                # Try individual fetch as fallback if batch failed
                 if info is None:
-                    # Try individual fetch as fallback
                     info = fetch_uniprot_info(uniprot_id)
-                    if info is None:
-                        row = [uniprot_id, ncbi_id, "", "", "", "", "", "", "", "", "", ""]
-                    else:
-                        print(f"{info["Sequence"]}")
-                        row = [
-                            uniprot_id,
-                            ncbi_id,
-                            info["Sequence"],
-                            ';'.join(info["GeneID"]),
-                            ';'.join(info["GO_mf"]),
-                            ';'.join(info["GO_cc"]),
-                            ';'.join(info["GO_bp"]),
-                            ';'.join(info["Pfam_domains"]),
-                            ';'.join(info["KEGG_pathways"]),
-                            ';'.join(info["PROSITE_annotations"]),
-                            ';'.join(info["PDB_structures"][:5]),
-                            ';'.join(info["AF_structures"])
-                        ]
-                else:
-                    row = [
-                        uniprot_id,
-                        ncbi_id,
-                        info["Sequence"],
-                        ';'.join(info["GeneID"]),
-                        ';'.join(info["GO_mf"]),
-                        ';'.join(info["GO_cc"]),
-                        ';'.join(info["GO_bp"]),
-                        ';'.join(info["Pfam_domains"]),
-                        ';'.join(info["KEGG_pathways"]),
-                        ';'.join(info["PROSITE_annotations"]),
-                        ';'.join(info["PDB_structures"][:5]),
-                        ';'.join(info["AF_structures"])
-                    ]
+                
+                row = format_protein_row(uniprot_id, ncbi_id, info)
                 out_f.write('\t'.join(row) + '\n')
             
             # Small delay between batches to be respectful to the API
-            time.sleep(0.1)
-def parse_input_tsv(input_tsv):
-    """
-    Parses the input TSV file to extract UniProt IDs.
+            time.sleep(API_DELAY)
 
-    Parameters:
-    input_tsv (str): Path to the input TSV file.
+
+def parse_input_tsv(input_tsv: str) -> Tuple[List[str], List[str]]:
+    """
+    Parses the input TSV file to extract UniProt IDs and NCBI IDs.
+
+    Args:
+        input_tsv: Path to the input TSV file
 
     Returns:
-    tuple: Lists of UniProt IDs and NCBI IDs.
+        Tuple of (uniprot_ids, ncbi_ids) lists
     """
     uniprot_ids = []
     ncbi_ids = []
@@ -288,61 +449,98 @@ def parse_input_tsv(input_tsv):
                 ncbi_ids.append("")
     return uniprot_ids, ncbi_ids
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Fetch protein information from UniProt.")
-    parser.add_argument("input_tsv", help="Input TSV file with UniProt IDs.")
-    parser.add_argument("output_tsv", help="Output TSV file to write protein information.")
-    parser.add_argument("--method", choices=["async", "batch", "sequential"], default="batch",
-                        help="Processing method: async (concurrent requests), batch (batch API), or sequential (original)")
-    parser.add_argument("--max-concurrent", type=int, default=10, 
-                        help="Maximum concurrent requests for async method (default: 10)")
-    parser.add_argument("--batch-size", type=int, default=25,
-                        help="Batch size for batch method (default: 25)")
+def main() -> None:
+    """
+    Main function to handle command-line arguments and orchestrate protein processing.
+    """
+    parser = argparse.ArgumentParser(
+        description="Fetch protein information from UniProt API",
+        epilog="Supports async, batch, and sequential processing methods for optimal performance."
+    )
+    parser.add_argument("input_tsv", help="Input TSV file with UniProt IDs")
+    parser.add_argument("output_tsv", help="Output TSV file to write protein information")
+    parser.add_argument(
+        "--method", 
+        choices=["async", "batch", "sequential"], 
+        default="batch",
+        help="Processing method (default: batch)"
+    )
+    parser.add_argument(
+        "--max-concurrent", 
+        type=int, 
+        default=DEFAULT_MAX_CONCURRENT,
+        help=f"Maximum concurrent requests for async method (default: {DEFAULT_MAX_CONCURRENT})"
+    )
+    parser.add_argument(
+        "--batch-size", 
+        type=int, 
+        default=DEFAULT_BATCH_SIZE,
+        help=f"Batch size for batch method (default: {DEFAULT_BATCH_SIZE})"
+    )
     args = parser.parse_args()
 
+    # Load UniProt and NCBI IDs from input file
     uniprot_ids, ncbi_ids = parse_input_tsv(args.input_tsv)
-    # uniprot_ids = ["P01308"] # test with insulin
-    # ncbi_ids = [""] * len(uniprot_ids)
     
     print(f"Processing {len(uniprot_ids)} proteins using {args.method} method...")
-    
+
+    # Process proteins using selected method
     start_time = time.time()
     
     if args.method == "async":
-        # Use asyncio for concurrent processing
         try:
-            asyncio.run(process_proteins_async(uniprot_ids, ncbi_ids, args.output_tsv, args.max_concurrent))
+            asyncio.run(process_proteins_async(
+                uniprot_ids, ncbi_ids, args.output_tsv, args.max_concurrent
+            ))
         except ImportError:
-            print("aiohttp not available. Install with: pip install aiohttp")
+            print("Warning: aiohttp not available. Install with: pip install aiohttp")
             print("Falling back to batch method...")
             process_proteins_batch(uniprot_ids, ncbi_ids, args.output_tsv, args.batch_size)
+            
     elif args.method == "batch":
-        # Use batch API
         process_proteins_batch(uniprot_ids, ncbi_ids, args.output_tsv, args.batch_size)
-    else:
-        # Original sequential method (kept for compatibility)
-        with open(args.output_tsv, 'w') as out_f:
-            header = ["UniProt_ID", "NCBI_ID", "GO_mf", "GO_cc", "GO_bp", "Pfam_domains", "KEGG_pathways", "PROSITE_annotations", "PDB_structures", "AF_structures"]
-            out_f.write('\t'.join(header) + '\n')
-            for uniprot_id, ncbi_id in tqdm(zip(uniprot_ids, ncbi_ids), total=len(uniprot_ids), desc="Processing proteins"):
-                print(f"Fetching data for {uniprot_id}...")
-                info = fetch_uniprot_info(uniprot_id)
-                if info is None:
-                    continue
-                row = [
-                    uniprot_id,
-                    ncbi_id,
-                    ';'.join(info["GO_mf"]),
-                    ';'.join(info["GO_cc"]),
-                    ';'.join(info["GO_bp"]),
-                    ';'.join(info["Pfam_domains"]),
-                    ';'.join(info["KEGG_pathways"]),
-                    ';'.join(info["PROSITE_annotations"]),
-                    ';'.join(info["PDB_structures"][:5]),  # Limit to first 5 PDB structures
-                    ';'.join(info["AF_structures"])
-                ]
-                out_f.write('\t'.join(row) + '\n')
-                # Removed the sleep to make it faster
+        
+    else:  # sequential method
+        process_proteins_sequential(uniprot_ids, ncbi_ids, args.output_tsv)
     
+    # Report timing
     elapsed_time = time.time() - start_time
-    print(f"Processing completed in {elapsed_time:.2f} seconds ({elapsed_time/len(uniprot_ids):.2f} seconds per protein)")
+    avg_time_per_protein = elapsed_time / len(uniprot_ids) if uniprot_ids else 0
+    
+    print(f"Processing completed in {elapsed_time:.2f} seconds")
+    print(f"Average time per protein: {avg_time_per_protein:.3f} seconds")
+
+
+def process_proteins_sequential(
+    uniprot_ids: List[str], 
+    ncbi_ids: List[str], 
+    output_tsv: str
+) -> None:
+    """
+    Process proteins sequentially (original method, kept for compatibility).
+    
+    Args:
+        uniprot_ids: List of UniProt IDs to process
+        ncbi_ids: List of corresponding NCBI IDs
+        output_tsv: Output file path
+    """
+    with open(output_tsv, 'w') as out_f:
+        # Write header
+        out_f.write('\t'.join(OUTPUT_HEADERS) + '\n')
+        
+        protein_pairs = tqdm(
+            zip(uniprot_ids, ncbi_ids), 
+            total=len(uniprot_ids), 
+            desc="Processing proteins"
+        )
+        
+        for uniprot_id, ncbi_id in protein_pairs:
+            info = fetch_uniprot_info(uniprot_id)
+            
+            if info is not None:  # Only write successful fetches
+                row = format_protein_row(uniprot_id, ncbi_id, info)
+                out_f.write('\t'.join(row) + '\n')
+
+
+if __name__ == "__main__":
+    main()
