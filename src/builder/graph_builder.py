@@ -91,6 +91,11 @@ def visualize_knowledge_graph(G, num_nodes=10):
     nx.draw_networkx_edge_labels(subgraph, pos, edge_labels=edge_labels)
     plt.show()
 
+def save_knowledge_graph(G, output_path):
+    '''Saves the knowledge graph to a GraphML file.'''
+    nx.write_graphml(G, output_path)
+    print(f"Knowledge graph saved to {output_path}")
+
 if __name__ == "__main__":
     # CLI
     parser = argparse.ArgumentParser(description="Build a knowledge graph from protein info TSV file or folder.")
@@ -144,3 +149,6 @@ if __name__ == "__main__":
 
     # Visualize a small subgraph
     visualize_knowledge_graph(kg, num_nodes=50)
+
+    # Save the knowledge graph
+    save_knowledge_graph(kg, "knowledge_graph.graphml")
