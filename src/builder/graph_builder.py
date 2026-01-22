@@ -52,6 +52,45 @@ def build_knowledge_graph(triples_dfs, nodes_dfs):
     
     return G
 
+def visualize_knowledge_graph(G, num_nodes=10):
+    '''Visualize a subgraph of knowledge graph starting from a set of random nodes and expanding to its neighbors.'''
+    import matplotlib.pyplot as plt
+    import random
+    if G.number_of_nodes() == 0:
+        print("Graph is empty. Cannot visualize.")
+        return
+    start_nodes = random.sample(list(G.nodes), min(num_nodes, G.number_of_nodes()))
+    nodes_to_include = set(start_nodes)
+    # Use a list for the frontier to ensure deterministic node selection order
+    frontier = list(start_nodes)
+    while len(nodes_to_include) < num_nodes and frontier:
+        # Pop from the front of the list for a deterministic BFS-like traversal
+        current_node = frontier.pop(0)
+        neighbors = set(G.neighbors(current_node))
+        for neighbor in neighbors:
+            if (
+                len(nodes_to_include) < num_nodes
+                and neighbor not in nodes_to_include
+                and neighbor not in frontier
+            ):
+                nodes_to_include.add(neighbor)
+                frontier.append(neighbor)
+            else:
+                break
+    subgraph = G.subgraph(nodes_to_include)
+    pos = nx.spring_layout(subgraph)
+    
+    # Map node types (strings) to numeric values for use with the colormap
+    node_types = [data['node_type'] for _, data in subgraph.nodes(data=True)]
+    unique_types = list(dict.fromkeys(node_types))
+    type_to_int = {t: i for i, t in enumerate(unique_types)}
+    node_colors = [type_to_int[t] for t in node_types]
+    
+    nx.draw(subgraph, pos, with_labels=True, node_color=node_colors, cmap=plt.cm.Set3)
+    edge_labels = nx.get_edge_attributes(subgraph, 'edge_type')
+    nx.draw_networkx_edge_labels(subgraph, pos, edge_labels=edge_labels)
+    plt.show()
+
 if __name__ == "__main__":
     # CLI
     parser = argparse.ArgumentParser(description="Build a knowledge graph from protein info TSV file or folder.")
@@ -94,3 +133,14 @@ if __name__ == "__main__":
     kg = build_knowledge_graph(triples_dfs, nodes_dfs)
     
     print(f"Knowledge graph has {kg.number_of_nodes()} nodes and {kg.number_of_edges()} edges.")
+
+    # print random sample of nodes and edges (n = 5)
+    print("\nSample nodes:")
+    for node in list(kg.nodes(data=True))[:5]:
+        print(node)
+    print("\nSample edges:")
+    for edge in list(kg.edges(data=True))[:5]:
+        print(edge)
+
+    # Visualize a small subgraph
+    visualize_knowledge_graph(kg, num_nodes=50)
