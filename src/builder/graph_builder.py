@@ -9,6 +9,7 @@ import networkx as nx
 import argparse
 import os
 import glob
+import matplotlib.pyplot as plt
 
 def build_triples_and_nodes_from_protein_info(file_path, 
                               list_of_targets, 
@@ -52,43 +53,26 @@ def build_knowledge_graph(triples_dfs, nodes_dfs):
     
     return G
 
-def visualize_knowledge_graph(G, num_nodes=10):
-    '''Visualize a subgraph of knowledge graph starting from a set of random nodes and expanding to its neighbors.'''
-    import matplotlib.pyplot as plt
-    import random
+def visualize_knowledge_graph(G, n_degree=2):
+    '''Visualizes a subgraph of KG to the extent of n_degree from a random node.'''
     if G.number_of_nodes() == 0:
-        print("Graph is empty. Cannot visualize.")
+        print("The graph is empty. No nodes to visualize.")
         return
-    start_nodes = random.sample(list(G.nodes), min(num_nodes, G.number_of_nodes()))
-    nodes_to_include = set(start_nodes)
-    # Use a list for the frontier to ensure deterministic node selection order
-    frontier = list(start_nodes)
-    while len(nodes_to_include) < num_nodes and frontier:
-        # Pop from the front of the list for a deterministic BFS-like traversal
-        current_node = frontier.pop(0)
-        neighbors = set(G.neighbors(current_node))
-        for neighbor in neighbors:
-            if (
-                len(nodes_to_include) < num_nodes
-                and neighbor not in nodes_to_include
-                and neighbor not in frontier
-            ):
-                nodes_to_include.add(neighbor)
-                frontier.append(neighbor)
-            else:
-                break
+    random_node = list(G.nodes())[0]
+    nodes_to_include = set([random_node])
+    for _ in range(n_degree):
+        neighbors = set()
+        for node in nodes_to_include:
+            neighbors.update(G.neighbors(node))
+            neighbors.update(G.predecessors(node))
+        nodes_to_include.update(neighbors)
     subgraph = G.subgraph(nodes_to_include)
-    pos = nx.spring_layout(subgraph)
-    
-    # Map node types (strings) to numeric values for use with the colormap
-    node_types = [data['node_type'] for _, data in subgraph.nodes(data=True)]
-    unique_types = list(dict.fromkeys(node_types))
-    type_to_int = {t: i for i, t in enumerate(unique_types)}
-    node_colors = [type_to_int[t] for t in node_types]
-    
-    nx.draw(subgraph, pos, with_labels=True, node_color=node_colors, cmap=plt.cm.Set3)
+    plt.figure(figsize=(12, 12))
+    pos = nx.spring_layout(subgraph, seed=42)
+    nx.draw(subgraph, pos, with_labels=True, node_size=500, node_color='lightblue', font_size=8, font_weight='bold', arrows=True)
     edge_labels = nx.get_edge_attributes(subgraph, 'edge_type')
-    nx.draw_networkx_edge_labels(subgraph, pos, edge_labels=edge_labels)
+    nx.draw_networkx_edge_labels(subgraph, pos, edge_labels=edge_labels, font_color='red', font_size=6)
+    plt.title(f"Subgraph of Knowledge Graph (n_degree={n_degree})")
     plt.show()
 
 def save_knowledge_graph(G, output_path):
@@ -148,7 +132,7 @@ if __name__ == "__main__":
         print(edge)
 
     # Visualize a small subgraph
-    visualize_knowledge_graph(kg, num_nodes=50)
+    visualize_knowledge_graph(kg, n_degree=1)
 
     # Save the knowledge graph
     save_knowledge_graph(kg, "knowledge_graph.graphml")
