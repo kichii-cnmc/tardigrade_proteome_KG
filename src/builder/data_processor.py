@@ -27,7 +27,7 @@ def build_kg_triple_dataframe(df, target, edge_type = None, weight = 1):
     '''Selects a target column from the input DataFrame and builds a triples DataFrame.'''
     triples_list = []
     for index, row in df.iterrows():
-        protein_id = row[0] # uses first column for ID
+        protein_id = row.iloc[0] # uses first column for ID
         target_values = str(row[target]).split(';') if pd.notna(row[target]) else []
         for target_value in target_values:
             target_value = target_value.strip()
