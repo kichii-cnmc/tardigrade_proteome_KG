@@ -6,10 +6,21 @@ def load_protein_info(file_path):
     df = pd.read_csv(file_path, sep="\t")
     return df
 
-def randomize_protein_info_selection(df, percentage = 100, seed = 42):
+def randomize_protein_info_selection(df, percentage = 100, seed = 42, orphan_removal = False):
     '''Randomly shuffle the DataFrame rows and select a percentage of rows.'''
-    if percentage < 100:
+    if percentage < 100 and not orphan_removal:
         df = df.sample(frac=percentage/100, random_state=seed).reset_index(drop=True)
+    if orphan_removal:
+        # remove rows where all target columns are NaN or empty
+        original_length = len(df)
+        target_columns = ['GO_mf', 'GO_cc', 'GO_bp', 'Pfam_domains', 'KEGG_pathways', 'PROSITE_annotations']
+        df = df.dropna(subset=target_columns, how='all')
+        for col in target_columns:
+            df = df[~df[col].astype(str).str.strip().eq('')]
+        df = df.reset_index(drop=True)
+        if percentage < 100:
+            percentage/((len(df)/original_length)*100)
+            df = df.sample(frac=percentage/((len(df)/original_length)*100), random_state=seed).reset_index(drop=True)
     return df
 
 def build_kg_triple_dataframe(df, target, edge_type = None, weight = 1):
@@ -64,7 +75,8 @@ if __name__ == "__main__":
     # Example usage
     file_path = "data/3_organized/protein_info_RV.tsv"
     df = load_protein_info(file_path)
-    df = randomize_protein_info_selection(df, percentage=10, seed=42)
+    df = randomize_protein_info_selection(df, percentage=10, seed=42, orphan_removal=True)
+    print(f"Selected {len(df)} proteins after randomization and orphan removal.")
 
     list_of_targets = [
         ('GO_mf', 'has_molecular_function', 1),
@@ -88,7 +100,6 @@ if __name__ == "__main__":
     for i, triples in enumerate(triples_df):
         print(f"\nTriples DataFrame {i+1}:\n", triples.head())
         print(f"Number of triples: {len(triples)}")
-
 
     nodes_df = build_set_of_node_types(df, list_of_node_types)
     for i, nodes in enumerate(nodes_df):
