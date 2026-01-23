@@ -2,7 +2,8 @@
 # merges were checked with Clustal Omega MSA to confirm identical sequences
 import os
 import argparse
-from pycdhit import cd_hit, read_clstr
+import subprocess
+import pandas as pd
 
 def combine_fastas(fasta_input_1, fasta_input_2, combined_fasta):
     """
@@ -58,27 +59,92 @@ def check_all_accessions_processed(fasta_input1, fasta_input2, accession_list):
         print("All accessions were processed successfully.")
         print(f"Input Accessions: {len(input_accessions_1)} and {len(input_accessions_2)}, Processed: {len(accession_set)}")
 
+def parse_cdhit_cluster_file(cluster_file):
+    """
+    Parses CD-HIT cluster file (.clstr) and returns a DataFrame similar to pycdhit output.
+    
+    Parameters:
+    cluster_file (str): Path to the .clstr file
+    
+    Returns:
+    pd.DataFrame: DataFrame with columns ['cluster', 'identifier', 'size', 'identity']
+    """
+    clusters = []
+    current_cluster = -1
+    
+    with open(cluster_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith('>Cluster'):
+                current_cluster = int(line.split()[-1])
+            elif line and not line.startswith('>'):
+                # Parse sequence entry: 0	426aa, >WP_011923077.1... at 100.00%
+                parts = line.split('\t')[1].split(',')
+                length_part = parts[0].strip()
+                size = int(length_part.replace('aa', '').replace('nt', ''))
+                
+                # Extract identifier
+                id_part = parts[1].strip()
+                if id_part.startswith('>'):
+                    identifier = id_part[1:].split('...')[0]
+                else:
+                    identifier = id_part.split('...')[0]
+                
+                # Extract identity (if present)
+                identity = 100.0  # Default for representative sequence
+                if 'at' in line and '%' in line:
+                    identity_str = line.split('at ')[-1].replace('%', '')
+                    try:
+                        identity = float(identity_str)
+                    except ValueError:
+                        identity = 100.0
+                
+                clusters.append({
+                    'cluster': current_cluster,
+                    'identifier': identifier,
+                    'size': size,
+                    'identity': identity
+                })
+    
+    return pd.DataFrame(clusters)
+
 def cluster_sequences(input_fasta, output_tsv, identity_threshold=1.0):
     """
     Clusters sequences in the input FASTA file using CD-HIT and writes the clustered sequences to the output FASTA file.
 
     Parameters:
     input_fasta (str): Path to the input FASTA file containing sequences to be clustered.
-    output_fasta (str): Path to the output FASTA file where clustered sequences will be saved.
+    output_tsv (str): Path to the output TSV file where cluster information will be saved.
     identity_threshold (float): Sequence identity threshold for clustering (default is 1.0).
     """
-    # Run CD-HIT
-    res = cd_hit(
-    i=input_fasta,
-    o="temp.fasta",
-    c=identity_threshold,
-    d=0,
-    sc=1,
-    )
-
-    df_clstr = read_clstr("temp.fasta" + ".clstr")
-    # print(df_clstr.head())
-
+    # Run CD-HIT using subprocess
+    temp_output = "temp.fasta"
+    temp_cluster = temp_output + ".clstr"
+    
+    cmd = [
+        "cd-hit",
+        "-i", input_fasta,
+        "-o", temp_output,
+        "-c", str(identity_threshold),
+        "-d", "0",  # sequence name length (0 = full)
+        "-sc", "1"  # sort clusters by size
+    ]
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        print("CD-HIT completed successfully")
+    except subprocess.CalledProcessError as e:
+        print(f"CD-HIT failed with error: {e}")
+        print(f"STDOUT: {e.stdout}")
+        print(f"STDERR: {e.stderr}")
+        raise
+    except FileNotFoundError:
+        print("CD-HIT not found. Please install it using: micromamba install cd-hit")
+        raise
+    
+    # Parse cluster file
+    df_clstr = parse_cdhit_cluster_file(temp_cluster)
+    
     # write tsv output, for each cluster value finds the longest sequence for each accession source
     accession_list = []
     with open(output_tsv, 'w') as out_f:
@@ -107,6 +173,7 @@ def cluster_sequences(input_fasta, output_tsv, identity_threshold=1.0):
                 else:
                     other_ids.append(accession)
             out_f.write(f"{uniprot_id}\t{uniprot_length}\t{ncbi_id}\t{ncbi_length}\t{';'.join(other_ids)}\n")
+    
     return accession_list
         
 if __name__ == "__main__":
@@ -126,7 +193,10 @@ if __name__ == "__main__":
     print("Checking all accessions were processed...")
     check_all_accessions_processed(args.fasta1, args.fasta2, accession_list)
     print("Cleaning up temporary files...")
-    os.remove("temp.fasta") 
-    os.remove("temp.fasta.clstr")
-    os.remove(combined_fasta)
+    if os.path.exists("temp.fasta"):
+        os.remove("temp.fasta") 
+    if os.path.exists("temp.fasta.clstr"):
+        os.remove("temp.fasta.clstr")
+    if os.path.exists(combined_fasta):
+        os.remove(combined_fasta)
     print("Process completed.")
