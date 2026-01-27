@@ -21,9 +21,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 # run the genome download script
-# bash src/1_collector/1_download_genomes.sh $(if [ "$TEST_MODE" = true ]; then echo "-t"; fi)
-# echo "Genome download completed."
-# echo
+bash src/1_collector/1_download_genomes.sh $(if [ "$TEST_MODE" = true ]; then echo "-t"; fi)
+echo "Genome download completed."
+echo
 
 # run the merge script on each species folders - only if proteomes were downloaded
 if [[ -f "data/1_raw/rv_proteome/rv_ncbi_proteome.faa" && -f "data/1_raw/rv_proteome/rv_uniprot_proteome.fasta" ]]; then
