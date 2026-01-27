@@ -19,7 +19,6 @@ from typing import Dict, List, Optional, Tuple, Any
 
 import aiohttp
 import requests
-from tqdm import tqdm
 import pandas as pd
 
 # Constants
@@ -391,19 +390,20 @@ async def process_proteins_async(
         results = []
         
         # Process results as they complete
-        completed_tasks = tqdm(
-            asyncio.as_completed(tasks), 
-            total=len(tasks), 
-            desc="Processing proteins"
-        )
+        print(f"Processing {len(tasks)} proteins...")
+        completed = 0
         
-        for i, task in enumerate(completed_tasks):
+        for i, task in enumerate(asyncio.as_completed(tasks)):
             info = await task
             uniprot_id = uniprot_ids[i]
             ncbi_id = ncbi_ids[i] if i < len(ncbi_ids) else ""
             
             row_dict = format_protein_row_dict(uniprot_id, ncbi_id, info)
             results.append(row_dict)
+            
+            completed += 1
+            if completed % 10 == 0:
+                print(f"Processed {completed}/{len(tasks)} proteins")
     
     return pd.DataFrame(results)
 
@@ -428,7 +428,12 @@ def process_proteins_batch(
     results = []
     total_batches = (len(uniprot_ids) + batch_size - 1) // batch_size
     
-    for i in tqdm(range(0, len(uniprot_ids), batch_size), total=total_batches, desc="Processing batches"):
+    print(f"Processing {len(uniprot_ids)} proteins in {total_batches} batches...")
+    
+    for i in range(0, len(uniprot_ids), batch_size):
+        batch_num = (i // batch_size) + 1
+        print(f"Processing batch {batch_num}/{total_batches}")
+        
         batch_uniprot_ids = uniprot_ids[i:i+batch_size]
         batch_ncbi_ids = ncbi_ids[i:i+batch_size] if i+batch_size <= len(ncbi_ids) else ncbi_ids[i:] + [""] * (i+batch_size-len(ncbi_ids))
         
@@ -494,13 +499,12 @@ def process_proteins_sequential(
     """
     results = []
     
-    protein_pairs = tqdm(
-        zip(uniprot_ids, ncbi_ids), 
-        total=len(uniprot_ids), 
-        desc="Processing proteins"
-    )
+    print(f"Processing {len(uniprot_ids)} proteins sequentially...")
     
-    for uniprot_id, ncbi_id in protein_pairs:
+    for i, (uniprot_id, ncbi_id) in enumerate(zip(uniprot_ids, ncbi_ids)):
+        if (i + 1) % 10 == 0:
+            print(f"Processed {i + 1}/{len(uniprot_ids)} proteins")
+        
         info = fetch_uniprot_info(uniprot_id)
         row_dict = format_protein_row_dict(uniprot_id, ncbi_id, info)
         results.append(row_dict)
