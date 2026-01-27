@@ -1,16 +1,18 @@
 name: tardigrade_proteome_KG_env
 channels:
-- bioconda
 - conda-forge
+- bioconda
+- nodefaults
 dependencies:
-- python=3.13
 - aiohttp
 - cd-hit
 - jupyter
 - matplotlib
 - networkx
 - pandas
+- python=3.12
 - pyyaml
 - requests
 - scipy
 - setuptools
+
