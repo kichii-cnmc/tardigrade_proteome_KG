@@ -15,12 +15,12 @@ Supports multiple processing methods: async, batch, and sequential.
 import asyncio
 import argparse
 import time
-from typing import Dict, List, Optional, Set, Tuple, Any
-import sys
+from typing import Dict, List, Optional, Tuple, Any
 
 import aiohttp
 import requests
 from tqdm import tqdm
+import pandas as pd
 
 # Constants
 UNIPROT_BASE_URL = "https://rest.uniprot.org/uniprotkb"
@@ -128,9 +128,9 @@ def fetch_uniprot_batch(uniprot_ids_batch: List[str]) -> Dict[str, Dict[str, Any
             results = {}
             
             for entry in data.get('results', []):
-                uniprot_id = entry.get('primaryAccession', '')
-                if uniprot_id:
-                    results[uniprot_id] = parse_uniprot_data(entry, uniprot_id)
+                primary_accession = entry.get('primaryAccession', '')
+                if primary_accession:
+                    results[primary_accession] = parse_uniprot_data(entry, primary_accession)
                     
             print(f"Successfully fetched {len(results)}/{len(uniprot_ids_batch)} proteins in batch")
             return results
@@ -171,13 +171,13 @@ def create_empty_protein_info() -> Dict[str, Any]:
     }
 
 
-def parse_uniprot_data(data: Dict[str, Any], uniprot_id: str) -> Dict[str, Any]:
+def parse_uniprot_data(data: Dict[str, Any], primary_id: str) -> Dict[str, Any]:
     """
     Parses UniProt JSON data to extract relevant information.
     
     Args:
         data: UniProt JSON response data
-        uniprot_id: UniProt accession ID for error reporting
+        primary_id: UniProt accession ID for error reporting
         
     Returns:
         Dictionary containing parsed protein information
@@ -306,9 +306,9 @@ def fetch_uniprot_info(uniprot_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def format_protein_row(uniprot_id: str, ncbi_id: str, info: Optional[Dict[str, Any]]) -> List[str]:
+def format_protein_row_dict(uniprot_id: str, ncbi_id: str, info: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """
-    Formats protein information into a TSV row.
+    Formats protein information into a dictionary for DataFrame creation.
     
     Args:
         uniprot_id: UniProt accession ID
@@ -316,41 +316,68 @@ def format_protein_row(uniprot_id: str, ncbi_id: str, info: Optional[Dict[str, A
         info: Protein information dictionary or None for failed fetches
         
     Returns:
-        List of strings representing a TSV row
+        Dictionary representing a DataFrame row
     """
     if info is None:
         # Return empty row for failed requests
-        return [uniprot_id, ncbi_id] + [""] * (len(OUTPUT_HEADERS) - 2)
+        return {
+            "UniProt_ID": uniprot_id,
+            "NCBI_ID": ncbi_id,
+            "Sequence": "",
+            "GeneID": "",
+            "GO_mf": "",
+            "GO_cc": "",
+            "GO_bp": "",
+            "Pfam_domains": "",
+            "KEGG_pathways": "",
+            "PROSITE_annotations": "",
+            "PDB_structures": "",
+            "AF_structures": ""
+        }
     
-    return [
-        uniprot_id,
-        ncbi_id,
-        info.get("Sequence", ""),
-        ";".join(info.get("GeneID", [])),
-        ";".join(info.get("GO_mf", [])),
-        ";".join(info.get("GO_cc", [])),
-        ";".join(info.get("GO_bp", [])),
-        ";".join(info.get("Pfam_domains", [])),
-        ";".join(info.get("KEGG_pathways", [])),
-        ";".join(info.get("PROSITE_annotations", [])),
-        ";".join(info.get("PDB_structures", [])[:MAX_PDB_STRUCTURES]),
-        ";".join(info.get("AF_structures", []))
-    ]
+    return {
+        "UniProt_ID": uniprot_id,
+        "NCBI_ID": ncbi_id,
+        "Sequence": info.get("Sequence", ""),
+        "GeneID": ";".join(info.get("GeneID", [])),
+        "GO_mf": ";".join(info.get("GO_mf", [])),
+        "GO_cc": ";".join(info.get("GO_cc", [])),
+        "GO_bp": ";".join(info.get("GO_bp", [])),
+        "Pfam_domains": ";".join(info.get("Pfam_domains", [])),
+        "KEGG_pathways": ";".join(info.get("KEGG_pathways", [])),
+        "PROSITE_annotations": ";".join(info.get("PROSITE_annotations", [])),
+        "PDB_structures": ";".join(info.get("PDB_structures", [])[:MAX_PDB_STRUCTURES]),
+        "AF_structures": ";".join(info.get("AF_structures", []))
+    }
+
+
+def save_dataframe_to_tsv(df: pd.DataFrame, output_tsv: str) -> None:
+    """
+    Save DataFrame to TSV file.
+    
+    Args:
+        df: DataFrame containing protein information
+        output_tsv: Output TSV file path
+    """
+    df.to_csv(output_tsv, sep='\t', index=False)
+    print(f"Saved {len(df)} protein records to {output_tsv}")
+
 
 async def process_proteins_async(
     uniprot_ids: List[str], 
     ncbi_ids: List[str], 
-    output_tsv: str, 
     max_concurrent: int = DEFAULT_MAX_CONCURRENT
-) -> None:
+) -> pd.DataFrame:
     """
     Process proteins asynchronously with controlled concurrency.
     
     Args:
         uniprot_ids: List of UniProt IDs to process
         ncbi_ids: List of corresponding NCBI IDs  
-        output_tsv: Output file path
         max_concurrent: Maximum number of concurrent requests
+        
+    Returns:
+        DataFrame containing protein information
     """
     semaphore = asyncio.Semaphore(max_concurrent)
     
@@ -361,31 +388,31 @@ async def process_proteins_async(
             for uniprot_id in uniprot_ids
         ]
         
-        with open(output_tsv, 'w') as out_f:
-            # Write header
-            out_f.write('\t'.join(OUTPUT_HEADERS) + '\n')
+        results = []
+        
+        # Process results as they complete
+        completed_tasks = tqdm(
+            asyncio.as_completed(tasks), 
+            total=len(tasks), 
+            desc="Processing proteins"
+        )
+        
+        for i, task in enumerate(completed_tasks):
+            info = await task
+            uniprot_id = uniprot_ids[i]
+            ncbi_id = ncbi_ids[i] if i < len(ncbi_ids) else ""
             
-            # Process results as they complete
-            completed_tasks = tqdm(
-                asyncio.as_completed(tasks), 
-                total=len(tasks), 
-                desc="Processing proteins"
-            )
-            
-            for i, task in enumerate(completed_tasks):
-                info = await task
-                uniprot_id = uniprot_ids[i]
-                ncbi_id = ncbi_ids[i] if i < len(ncbi_ids) else ""
-                
-                row = format_protein_row(uniprot_id, ncbi_id, info)
-                out_f.write('\t'.join(row) + '\n')
+            row_dict = format_protein_row_dict(uniprot_id, ncbi_id, info)
+            results.append(row_dict)
+    
+    return pd.DataFrame(results)
+
 
 def process_proteins_batch(
     uniprot_ids: List[str], 
     ncbi_ids: List[str], 
-    output_tsv: str, 
     batch_size: int = DEFAULT_BATCH_SIZE
-) -> None:
+) -> pd.DataFrame:
     """
     Process proteins in batches using UniProt's batch API.
     Uses smaller batch sizes to avoid API 400 errors.
@@ -393,36 +420,37 @@ def process_proteins_batch(
     Args:
         uniprot_ids: List of UniProt IDs to process
         ncbi_ids: List of corresponding NCBI IDs
-        output_tsv: Output file path
         batch_size: Number of proteins to process in each batch
+        
+    Returns:
+        DataFrame containing protein information
     """
-    with open(output_tsv, 'w') as out_f:
-        # Write header
-        out_f.write('\t'.join(OUTPUT_HEADERS) + '\n')
+    results = []
+    total_batches = (len(uniprot_ids) + batch_size - 1) // batch_size
+    
+    for i in tqdm(range(0, len(uniprot_ids), batch_size), total=total_batches, desc="Processing batches"):
+        batch_uniprot_ids = uniprot_ids[i:i+batch_size]
+        batch_ncbi_ids = ncbi_ids[i:i+batch_size] if i+batch_size <= len(ncbi_ids) else ncbi_ids[i:] + [""] * (i+batch_size-len(ncbi_ids))
         
-        total_batches = (len(uniprot_ids) + batch_size - 1) // batch_size
+        # Fetch batch data
+        batch_results = fetch_uniprot_batch(batch_uniprot_ids)
         
-        for i in tqdm(range(0, len(uniprot_ids), batch_size), total=total_batches, desc="Processing batches"):
-            batch_uniprot_ids = uniprot_ids[i:i+batch_size]
-            batch_ncbi_ids = ncbi_ids[i:i+batch_size] if i+batch_size <= len(ncbi_ids) else ncbi_ids[i:] + [""] * (i+batch_size-len(ncbi_ids))
+        # Process each protein in the batch
+        for j, uniprot_id in enumerate(batch_uniprot_ids):
+            ncbi_id = batch_ncbi_ids[j] if j < len(batch_ncbi_ids) else ""
+            info = batch_results.get(uniprot_id)
             
-            # Fetch batch data
-            batch_results = fetch_uniprot_batch(batch_uniprot_ids)
+            # Try individual fetch as fallback if batch failed
+            if info is None:
+                info = fetch_uniprot_info(uniprot_id)
             
-            # Process each protein in the batch
-            for j, uniprot_id in enumerate(batch_uniprot_ids):
-                ncbi_id = batch_ncbi_ids[j] if j < len(batch_ncbi_ids) else ""
-                info = batch_results.get(uniprot_id)
-                
-                # Try individual fetch as fallback if batch failed
-                if info is None:
-                    info = fetch_uniprot_info(uniprot_id)
-                
-                row = format_protein_row(uniprot_id, ncbi_id, info)
-                out_f.write('\t'.join(row) + '\n')
-            
-            # Small delay between batches to be respectful to the API
-            time.sleep(API_DELAY)
+            row_dict = format_protein_row_dict(uniprot_id, ncbi_id, info)
+            results.append(row_dict)
+        
+        # Small delay between batches to be respectful to the API
+        time.sleep(API_DELAY)
+    
+    return pd.DataFrame(results)
 
 
 def parse_input_tsv(input_tsv: str) -> Tuple[List[str], List[str]]:
@@ -448,6 +476,37 @@ def parse_input_tsv(input_tsv: str) -> Tuple[List[str], List[str]]:
             else:
                 ncbi_ids.append("")
     return uniprot_ids, ncbi_ids
+
+
+def process_proteins_sequential(
+    uniprot_ids: List[str], 
+    ncbi_ids: List[str]
+) -> pd.DataFrame:
+    """
+    Process proteins sequentially (original method, kept for compatibility).
+    
+    Args:
+        uniprot_ids: List of UniProt IDs to process
+        ncbi_ids: List of corresponding NCBI IDs
+        
+    Returns:
+        DataFrame containing protein information
+    """
+    results = []
+    
+    protein_pairs = tqdm(
+        zip(uniprot_ids, ncbi_ids), 
+        total=len(uniprot_ids), 
+        desc="Processing proteins"
+    )
+    
+    for uniprot_id, ncbi_id in protein_pairs:
+        info = fetch_uniprot_info(uniprot_id)
+        row_dict = format_protein_row_dict(uniprot_id, ncbi_id, info)
+        results.append(row_dict)
+    
+    return pd.DataFrame(results)
+
 
 def main() -> None:
     """
@@ -489,19 +548,22 @@ def main() -> None:
     
     if args.method == "async":
         try:
-            asyncio.run(process_proteins_async(
-                uniprot_ids, ncbi_ids, args.output_tsv, args.max_concurrent
+            df = asyncio.run(process_proteins_async(
+                uniprot_ids, ncbi_ids, args.max_concurrent
             ))
         except ImportError:
             print("Warning: aiohttp not available. Install with: pip install aiohttp")
             print("Falling back to batch method...")
-            process_proteins_batch(uniprot_ids, ncbi_ids, args.output_tsv, args.batch_size)
+            df = process_proteins_batch(uniprot_ids, ncbi_ids, args.batch_size)
             
     elif args.method == "batch":
-        process_proteins_batch(uniprot_ids, ncbi_ids, args.output_tsv, args.batch_size)
+        df = process_proteins_batch(uniprot_ids, ncbi_ids, args.batch_size)
         
     else:  # sequential method
-        process_proteins_sequential(uniprot_ids, ncbi_ids, args.output_tsv)
+        df = process_proteins_sequential(uniprot_ids, ncbi_ids)
+    
+    # Save DataFrame to TSV
+    save_dataframe_to_tsv(df, args.output_tsv)
     
     # Report timing
     elapsed_time = time.time() - start_time
@@ -509,37 +571,6 @@ def main() -> None:
     
     print(f"Processing completed in {elapsed_time:.2f} seconds")
     print(f"Average time per protein: {avg_time_per_protein:.3f} seconds")
-
-
-def process_proteins_sequential(
-    uniprot_ids: List[str], 
-    ncbi_ids: List[str], 
-    output_tsv: str
-) -> None:
-    """
-    Process proteins sequentially (original method, kept for compatibility).
-    
-    Args:
-        uniprot_ids: List of UniProt IDs to process
-        ncbi_ids: List of corresponding NCBI IDs
-        output_tsv: Output file path
-    """
-    with open(output_tsv, 'w') as out_f:
-        # Write header
-        out_f.write('\t'.join(OUTPUT_HEADERS) + '\n')
-        
-        protein_pairs = tqdm(
-            zip(uniprot_ids, ncbi_ids), 
-            total=len(uniprot_ids), 
-            desc="Processing proteins"
-        )
-        
-        for uniprot_id, ncbi_id in protein_pairs:
-            info = fetch_uniprot_info(uniprot_id)
-            
-            if info is not None:  # Only write successful fetches
-                row = format_protein_row(uniprot_id, ncbi_id, info)
-                out_f.write('\t'.join(row) + '\n')
 
 
 if __name__ == "__main__":
