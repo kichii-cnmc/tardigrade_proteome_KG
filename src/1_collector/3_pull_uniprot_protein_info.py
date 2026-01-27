@@ -361,6 +361,14 @@ def save_dataframe_to_tsv(df: pd.DataFrame, output_tsv: str) -> None:
     df.to_csv(output_tsv, sep='\t', index=False)
     print(f"Saved {len(df)} protein records to {output_tsv}")
 
+def save_dataframe_to_separate_tsvs(df: pd.DataFrame, output_prefix: str) -> None:
+    '''
+    Save DataFrame to separate TSV files for each column, includes primary ID column.'''
+    for column in df.columns:
+        output_tsv = f"{output_prefix}_{column}.tsv"
+        df_subset = df[[df.columns[0], column]]  # Include primary ID column
+        df_subset.to_csv(output_tsv, sep='\t', index=False)
+        print(f"Saved {len(df_subset)} records to {output_tsv}")
 
 async def process_proteins_async(
     uniprot_ids: List[str], 
@@ -567,7 +575,8 @@ def main() -> None:
         df = process_proteins_sequential(uniprot_ids, ncbi_ids)
     
     # Save DataFrame to TSV
-    save_dataframe_to_tsv(df, args.output_tsv)
+    # save_dataframe_to_tsv(df, args.output_tsv)
+    save_dataframe_to_separate_tsvs(df, args.output_tsv.replace('.tsv', ''))
     
     # Report timing
     elapsed_time = time.time() - start_time
