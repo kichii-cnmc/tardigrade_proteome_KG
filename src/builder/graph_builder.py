@@ -1,9 +1,5 @@
-from data_processor import (
-    load_protein_info,
-    randomize_protein_info_selection,
-    build_set_of_kg_triples,
-    build_set_of_node_types
-)
+# Used to build knowledge graph from protein info TSV files or folder.
+
 import pandas as pd
 import networkx as nx
 import argparse
@@ -11,45 +7,134 @@ import os
 import glob
 import matplotlib.pyplot as plt
 
-def build_triples_and_nodes_from_protein_info(file_path, 
-                              list_of_targets, 
-                              list_of_node_types, 
-                              selection_percentage=100, 
-                              random_seed=42):
-    """Builds knowledge graph triples and node type DataFrames from protein info TSV file or all files in a folder."""
+def load_tsv_into_df(file_path, selection_percentage=100):
+    '''Load protein info from TSV file into a pandas DataFrame.'''
+    df = pd.read_csv(file_path, sep="\t")
+    # keep only the top X% of rows if selection_percentage < 100
+    if selection_percentage < 100:
+        num_rows = int(len(df) * (selection_percentage / 100))
+        df = df.iloc[:num_rows].reset_index(drop=True)
+    return df
 
-    # Load protein info
-    if os.path.isdir(file_path):
-        all_files = glob.glob(os.path.join(file_path, "*.tsv"))
-        df_list = [load_protein_info(f) for f in all_files]
-        df = pd.concat(df_list, ignore_index=True)
-    else:
-        df = load_protein_info(file_path)
-    
-    # Randomize selection if needed
-    df = randomize_protein_info_selection(df, percentage=selection_percentage, seed=random_seed)
-    
-    # Build triples DataFrames
-    triples_dfs = build_set_of_kg_triples(df, list_of_targets)
-    
-    # Build node type DataFrames
-    nodes_dfs = build_set_of_node_types(df, list_of_node_types)
-    
-    return triples_dfs, nodes_dfs
+def load_tsvs_from_folder(folder_path, selection_percentage=100):
+    '''Load all TSV files from a folder into a list of pandas DataFrames.'''
+    all_files = glob.glob(os.path.join(folder_path, "*.tsv"))
+    df_list = []
+    for file in all_files:
+        df = pd.read_csv(file, sep="\t")
+        # keep only the top X% of rows if selection_percentage < 100
+        if selection_percentage < 100:
+            num_rows = int(len(df) * (selection_percentage / 100))
+            df = df.iloc[:num_rows].reset_index(drop=True)
+        df_list.append(df)
+    return df_list
 
-def build_knowledge_graph(triples_dfs, nodes_dfs):
-    """Builds a NetworkX knowledge graph from triples and node type DataFrames."""
-    G = nx.DiGraph()
+def collect_header_names(df_list, n = 0):
+    '''Collect a list of the nth header names from a set of DataFrames.'''
+    header_names = []
+    for df in df_list:
+        if n < len(df.columns):
+            header_names.append(df.columns[n])
+    return header_names
+
+def build_kg_target_triples_df_list(df_list, list_of_targets):
+    '''List version of build_kg_target_triples_df, used to process multiple targets.'''
+    all_triples_df = []
+    target_names = [target[0] for target in list_of_targets]
+    df_names = collect_header_names(df_list, 1)
+    for i, df in enumerate(df_list):
+        if df_names[i] in target_names:
+            target_index = target_names.index(df_names[i])
+            target, edge_type, weight = list_of_targets[target_index]
+            triples_df = build_kg_target_triples_df(df, target, edge_type, weight)
+            all_triples_df.append(triples_df)
+    return all_triples_df
+
+def build_kg_node_attr_df_list(df_list, list_of_node_attr):
+    '''List version of build_kg_node_attr_df, used to process multiple node attributes.'''
+    all_nodes_df = []
+    node_attr_names = [node_attr[0] for node_attr in list_of_node_attr]
+    df_names = collect_header_names(df_list, 1)
+    for i, df in enumerate(df_list):
+        if df_names[i] in node_attr_names:
+            node_attr_index = node_attr_names.index(df_names[i])
+            id_column, node_attr_value = list_of_node_attr[node_attr_index]
+            nodes_df = build_kg_node_attr_df(df, id_column, node_attr_value)
+            all_nodes_df.append(nodes_df)
+    return all_nodes_df
+
+def build_kg_node_alias_attr_df_list(df_list, list_of_node_alias_attr):
+    '''List version of build_kg_node_alias_attr_df, used to process multiple alias attributes.'''
+    all_alias_df = []
+    alias_attr_names = [alias_attr[0] for alias_attr in list_of_node_alias_attr]
+    df_names = collect_header_names(df_list, 1)
+    for i, df in enumerate(df_list):
+        if df_names[i] in alias_attr_names:
+            alias_attr_index = alias_attr_names.index(df_names[i])
+            id_column, alias_attr_column = list_of_node_alias_attr[alias_attr_index]
+            alias_df = build_kg_node_alias_attr_df(df, id_column, alias_attr_column)
+            all_alias_df.append(alias_df)
+    return all_alias_df
+
+def build_kg_target_triples_df(df, target, edge_type = None, weight = 1):
+    '''Builds triples from the DataFrame based on a target column, edge type, and weight.'''
+    triples_list = []
+    for index, row in df.iterrows():
+        source_id = row.iloc[0]  # assuming the first column is the source ID
+        target_values = str(row[target]).split(';') if pd.notna(row[target]) else []
+        for target_value in target_values:
+            target_value = target_value.strip()
+            if target_value:
+                triples_list.append((source_id, target_value, edge_type, weight))
+    triples_df = pd.DataFrame(triples_list, columns=['source', 'target', 'edge_type', 'weight'])
+    return triples_df
+
+def build_kg_node_attr_df(df, id_column, node_attr_value):
+    '''Builds a DataFrame for assigning the same node_attr value to all ids under the id_column.'''
+    nodes_set = set()
+    for index, row in df.iterrows():
+        id_values = str(row[id_column]).split(';') if pd.notna(row[id_column]) else []
+        for id_value in id_values:
+            id_value = id_value.strip()
+            if id_value:
+                nodes_set.add((id_value, node_attr_value))
+    nodes_df = pd.DataFrame(list(nodes_set), columns=['id', 'node_attr'])
+    return nodes_df
+
+def build_kg_node_alias_attr_df(df, id_column, alias_attr_column):
+    '''Builds a DataFrame for assigning an alias attribute to nodes of a specific type.'''
+    alias_set = set()
+    for index, row in df.iterrows():
+        id_values = str(row[id_column]).split(';') if pd.notna(row[id_column]) else []
+        for id_value in id_values:
+            id_value = id_value.strip()
+            if id_value:
+                alias_set.add((id_value, row[alias_attr_column]))
+    alias_df = pd.DataFrame(list(alias_set), columns=['id', 'alias_attr'])
+    return alias_df
+
+def build_knowledge_graph(triples_df_list, node_attr_df_list, node_alias_attr_df_list):
+    '''Builds a NetworkX knowledge graph from triples and node attributes.'''
+    G = nx.MultiDiGraph()
     
-    # Add nodes with types
-    for nodes_df in nodes_dfs:
-        for _, row in nodes_df.iterrows():
-            G.add_node(row['id'], node_type=row['node_type'])
-    
-    # Add edges from triples
-    for triples_df in triples_dfs:
-        for _, row in triples_df.iterrows():
+    # Add triples as edges
+    for triples_df in triples_df_list:
+        for index, row in triples_df.iterrows():
             G.add_edge(row['source'], row['target'], edge_type=row['edge_type'], weight=row['weight'])
+    
+    # Add node attributes
+    for node_attr_df in node_attr_df_list:
+        for index, row in node_attr_df.iterrows():
+            if 'node_attr' not in G.nodes[row['id']]:
+                G.nodes[row['id']]['node_attr'] = []
+            G.nodes[row['id']]['node_attr'].append(row['node_attr'])
+    
+    # Add alias attributes
+    for alias_attr_df in node_alias_attr_df_list:
+        for index, row in alias_attr_df.iterrows():
+            if 'alias_attr' not in G.nodes[row['id']]:
+                G.nodes[row['id']]['alias_attr'] = []
+            G.nodes[row['id']]['alias_attr'].append(row['alias_attr'])
     
     return G
 
@@ -75,11 +160,6 @@ def visualize_knowledge_graph(G, n_degree=2):
     plt.title(f"Subgraph of Knowledge Graph (n_degree={n_degree})")
     plt.show()
 
-def save_knowledge_graph(G, output_path):
-    '''Saves the knowledge graph to a GraphML file.'''
-    nx.write_graphml(G, output_path)
-    print(f"Knowledge graph saved to {output_path}")
-
 if __name__ == "__main__":
     # CLI
     parser = argparse.ArgumentParser(description="Build a knowledge graph from protein info TSV file or folder.")
@@ -101,7 +181,7 @@ if __name__ == "__main__":
         ('KEGG_pathways', 'in_kegg_pathway', 1),
         ('PROSITE_annotations', 'has_prosite_annotation', 1)
     ]
-    list_of_node_types = [
+    list_of_node_attr = [
         ('UniProt_ID', 'Protein'),
         ('GO_mf', 'Molecular_Function'),
         ('GO_cc', 'Cellular_Component'),
@@ -110,29 +190,36 @@ if __name__ == "__main__":
         ('KEGG_pathways', 'KEGG_Pathway'),
         ('PROSITE_annotations', 'PROSITE_Annotation')
     ]
-    
-    triples_dfs, nodes_dfs = build_triples_and_nodes_from_protein_info(
-        file_path, 
-        list_of_targets, 
-        list_of_node_types, 
-        selection_percentage=selection_percentage, 
-        random_seed=random_seed
-    )
-    
-    kg = build_knowledge_graph(triples_dfs, nodes_dfs)
-    
-    print(f"Knowledge graph has {kg.number_of_nodes()} nodes and {kg.number_of_edges()} edges.")
+    list_of_node_alias_attr = [
+        ('UniProt_ID', 'NCBI_ID')
+        # ('UniProt_ID', 'Organism'),
+        # ('UniProt_ID', 'Gene_Name')
+    ]
 
-    # print random sample of nodes and edges (n = 5)
-    print("\nSample nodes:")
-    for node in list(kg.nodes(data=True))[:5]:
-        print(node)
-    print("\nSample edges:")
-    for edge in list(kg.edges(data=True))[:5]:
-        print(edge)
+    # load all tsv files from folder
+    df_list = load_tsvs_from_folder(file_path, selection_percentage=selection_percentage) if os.path.isdir(file_path) else [load_tsv_into_df(file_path, selection_percentage=selection_percentage)]
+    print(f"Loaded {len(df_list)} TSV files from {file_path}.")
 
-    # Visualize a small subgraph
-    visualize_knowledge_graph(kg, n_degree=1)
+    # go through the list of tsvs/dataframes and build triples and node attribute dataframes
+    triples_df_list = build_kg_target_triples_df_list(df_list, list_of_targets)
+    node_attr_df_list = build_kg_node_attr_df_list(df_list, list_of_node_attr)
+    node_alias_attr_df_list = build_kg_node_alias_attr_df_list(df_list, list_of_node_alias_attr)
 
-    # Save the knowledge graph
-    save_knowledge_graph(kg, "knowledge_graph.graphml")
+    # build knowledge graph
+    G = build_knowledge_graph(triples_df_list, node_attr_df_list, node_alias_attr_df_list)
+
+    print(f"Knowledge graph has {G.number_of_nodes()} nodes and {G.number_of_edges()} edges.")
+    # visualize knowledge graph
+    # visualize_knowledge_graph(G, n_degree=2)
+
+    # print a specific node's attributes and connections for verification: A0A1D1W4Z0
+    sample_node = list(G.nodes())[0]
+    print(f"Sample node: {sample_node}")
+    print(f"Attributes: {G.nodes[sample_node]}")
+    print(f"Connections: {list(G.edges(sample_node, data=True))}")
+    
+
+
+
+    
+    
