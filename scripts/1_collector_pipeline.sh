@@ -27,6 +27,11 @@ if [ -f "$LOG_FILE" ]; then
     echo "Cleared existing download log file."
 fi
 
+# clear 3_organized directory
+rm -rf data/3_organized/*.tsv
+echo "Cleared existing organized data files."
+echo
+
 # run the genome download script
 bash src/1_collector/1_download_genomes.sh $(if [ "$TEST_MODE" = true ]; then echo "-t"; fi)
 echo "Genome download completed."
