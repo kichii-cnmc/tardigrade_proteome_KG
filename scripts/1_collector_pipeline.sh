@@ -71,4 +71,12 @@ fi
 # collect STRING PPI data
 bash src/1_collector/4_download_string_ppi.sh
 
+# process STRING PPI data
+if [[ -f "data/1_raw/string_ppi/rv_ppi.txt" ]]; then
+    python3 src/1_collector/5_process_string_ppi.py data/1_raw/string_ppi/rv_ppi.txt data/3_organized/processed_rv_ppi.tsv
+fi
+if [[ -f "data/1_raw/string_ppi/he_ppi.txt" ]]; then
+    python3 src/1_collector/5_process_string_ppi.py data/1_raw/string_ppi/he_ppi.txt data/3_organized/processed_he_ppi.tsv
+fi
+
 echo "Protein information retrieval completed."
