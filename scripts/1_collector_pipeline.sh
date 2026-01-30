@@ -68,4 +68,7 @@ if [ "$TEST_MODE" = false ]; then
     fi
 fi
 
+# collect STRING PPI data
+bash src/1_collector/4_download_string_ppi.sh
+
 echo "Protein information retrieval completed."
