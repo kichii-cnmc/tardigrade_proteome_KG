@@ -25,5 +25,6 @@ if __name__ == "__main__":
     parser.add_argument('output_file', type=str, help='Path to the output TSV file.')
     args = parser.parse_args()
 
+    print("Processing STRING PPI data...")
     process_string_ppi_file(args.input_file, args.output_file)
     print(f"Processed STRING PPI data saved to {args.output_file}.")
