@@ -76,7 +76,7 @@ def build_kg_node_alias_attr_df_list(df_list, list_of_node_alias_attr):
             all_alias_df.append(alias_df)
     return all_alias_df
 
-def build_kg_target_triples_df(df, target, edge_type = None, weight = 1):
+def build_kg_target_triples_df(df, target, edge_type = None, weight = None):
     '''Builds triples from the DataFrame based on a target column, edge type, and weight.'''
     triples_list = []
     for index, row in df.iterrows():
@@ -84,6 +84,8 @@ def build_kg_target_triples_df(df, target, edge_type = None, weight = 1):
         target_values = str(row[target]).split(';') if pd.notna(row[target]) else []
         for target_value in target_values:
             target_value = target_value.strip()
+            if weight is None:
+                weight = row.iloc[2] if len(row) > 2 else 1  # default weight from third column or 1
             if target_value:
                 triples_list.append((source_id, target_value, edge_type, weight))
     triples_df = pd.DataFrame(triples_list, columns=['source', 'target', 'edge_type', 'weight'])
@@ -179,7 +181,8 @@ if __name__ == "__main__":
         ('GO_bp', 'involved_in_biological_process', 1),
         ('Pfam_domains', 'has_pfam_domain', 1),
         ('KEGG_pathways', 'in_kegg_pathway', 1),
-        ('PROSITE_annotations', 'has_prosite_annotation', 1)
+        ('PROSITE_annotations', 'has_prosite_annotation', 1),
+        ('PPI_target', 'interacts_with', None)
     ]
     list_of_node_attr = [
         ('UniProt_ID', 'Protein'),
