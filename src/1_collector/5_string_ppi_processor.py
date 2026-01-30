@@ -14,8 +14,15 @@ def process_string_ppi_file(input_file, output_file):
     df['protein1'] = df['protein1'].apply(isolate_protein_id)
     df['protein2'] = df['protein2'].apply(isolate_protein_id)
 
+    # removes scores less than a threshold (current: 300)
+    df = df[df['combined_score'] >= 400]
+
     # divide score by 1000 to normalize between 0 and 1
     df['combined_score'] = df['combined_score'] / 1000.0
+
+    # rename columns to match KG building expectations
+    df = df.rename(columns={'protein1': 'PPI_source', 'protein2': 'PPI_target', 'combined_score': 'score'})
+
     df.to_csv(output_file, sep='\t', index=False)
 
 if __name__ == "__main__":
