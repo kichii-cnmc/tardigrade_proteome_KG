@@ -3,52 +3,8 @@
 # This script is used to download the STRING PPI data for Ramazzottius varieornatus (missing for Hypsibius exemplaris)
 echo "Downloading STRING PPI data..."
 
-# Function to log download metadata to JSON file
-log_download() {
-    local file="$1"
-    local url="$2"
-    local source="$3"
-    local organism="$4"
-    local taxonomy_id="$5"
-    local version="$6"
-    local script_name="$(basename "$0")"
-    local timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    
-    mkdir -p logs
-    local log_file="logs/download_metadata.json"
-    
-    # Create new entry
-    local new_entry="{
-      \"timestamp\": \"$timestamp\",
-      \"script\": \"$script_name\",
-      \"source\": \"$source\",
-      \"file\": \"$file\",
-      \"url\": \"$url\",
-      \"organism\": \"$organism\",
-      \"taxonomy_id\": \"$taxonomy_id\",
-      \"version\": \"$version\"
-    }"
-    
-    # Initialize file if it doesn't exist
-    if [ ! -f "$log_file" ]; then
-        echo '{"downloads": []}' > "$log_file"
-    fi
-    
-    # Add new entry (simple append - assumes valid JSON structure)
-    if grep -q '"downloads": \[\]' "$log_file"; then
-        # Empty array - add first entry
-        sed -i '' 's/"downloads": \[\]/"downloads": [\
-    '"$new_entry"'\
-  ]/' "$log_file"
-    else
-        # Has entries - add to array
-        sed -i '' 's/\(.*\)\]/\1,\
-    '"$new_entry"'\
-  ]/' "$log_file"
-    fi
-    
-    echo "Download logged to $log_file"
-}
+# Source the shared logging utility
+source "$(dirname "$0")/download_logger.sh"
 
 # if none make directory for STRING data
 mkdir -p data/1_raw/string_ppi

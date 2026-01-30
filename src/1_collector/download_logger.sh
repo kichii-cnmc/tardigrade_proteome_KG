@@ -18,36 +18,72 @@ log_download() {
     mkdir -p "$project_root/logs"
     local log_file="$project_root/logs/download_metadata.json"
     
-    # Create new entry with proper JSON escaping
-    local new_entry="{
-      \"timestamp\": \"$timestamp\",
-      \"script\": \"$script_name\",
-      \"source\": \"$source\",
-      \"file\": \"$file\",
-      \"url\": \"$url\",
-      \"organism\": \"$organism\",
-      \"taxonomy_id\": \"$taxonomy_id\",
-      \"version\": \"$version\"
-    }"
+    echo "Logging download: $organism - $source"
     
     # Initialize file if it doesn't exist
     if [ ! -f "$log_file" ]; then
         echo '{"downloads": []}' > "$log_file"
     fi
     
-    # Add new entry
-    if grep -q '"downloads": \[\]' "$log_file"; then
-        # Empty array - add first entry
-        sed -i '' 's/"downloads": \[\]/"downloads": [\
-    '"$new_entry"'\
-  ]/' "$log_file"
+    # Create temporary file for JSON manipulation
+    local temp_file=$(mktemp)
+    
+    # Create new entry (escape quotes in JSON values)
+    local escaped_url=$(echo "$url" | sed 's/"/\\"/g')
+    local escaped_source=$(echo "$source" | sed 's/"/\\"/g')
+    local escaped_organism=$(echo "$organism" | sed 's/"/\\"/g')
+    local escaped_file=$(echo "$file" | sed 's/"/\\"/g')
+    
+    cat << EOF > "$temp_file"
+{
+  "timestamp": "$timestamp",
+  "script": "$script_name",
+  "source": "$escaped_source",
+  "file": "$escaped_file",
+  "url": "$escaped_url",
+  "organism": "$escaped_organism",
+  "taxonomy_id": "$taxonomy_id",
+  "version": "$version"
+}
+EOF
+    
+    # Add entry to JSON array using Python (more reliable than sed)
+    if command -v python3 &> /dev/null; then
+        python3 -c "
+import json
+import sys
+
+# Read existing log file
+try:
+    with open('$log_file', 'r') as f:
+        data = json.load(f)
+except:
+    data = {'downloads': []}
+
+# Read new entry
+with open('$temp_file', 'r') as f:
+    new_entry = json.load(f)
+
+# Add new entry
+data['downloads'].append(new_entry)
+
+# Write back
+with open('$log_file', 'w') as f:
+    json.dump(data, f, indent=2)
+"
     else
-        # Has entries - add to array
-        sed -i '' 's/\(.*\)\]/\1,\
-    '"$new_entry"'\
-  ]/' "$log_file"
+        # Fallback: simple append (less reliable but works without Python)
+        if grep -q '"downloads": \[\]' "$log_file"; then
+            # Empty array - replace with first entry
+            sed -i '' "s/\"downloads\": \[\]/\"downloads\": [$(cat "$temp_file")]/" "$log_file"
+        else
+            # Has entries - append to array (this is fragile but better than nothing)
+            echo "Warning: Using basic JSON append - install python3 for reliable JSON handling"
+            sed -i '' "s/\]\s*$/,$(cat "$temp_file")]/" "$log_file"
+        fi
     fi
     
+    rm -f "$temp_file"
     echo "Download logged to $log_file"
 }
 
