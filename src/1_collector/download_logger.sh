@@ -64,22 +64,22 @@ except:
 with open('$temp_file', 'r') as f:
     new_entry = json.load(f)
 
-# Add new entry
-data['downloads'].append(new_entry)
+# Add new entry at the beginning (newest first)
+data['downloads'].insert(0, new_entry)
 
 # Write back
 with open('$log_file', 'w') as f:
     json.dump(data, f, indent=2)
 "
     else
-        # Fallback: simple append (less reliable but works without Python)
+        # Fallback: simple prepend (less reliable but works without Python)
         if grep -q '"downloads": \[\]' "$log_file"; then
             # Empty array - replace with first entry
             sed -i '' "s/\"downloads\": \[\]/\"downloads\": [$(cat "$temp_file")]/" "$log_file"
         else
-            # Has entries - append to array (this is fragile but better than nothing)
-            echo "Warning: Using basic JSON append - install python3 for reliable JSON handling"
-            sed -i '' "s/\]\s*$/,$(cat "$temp_file")]/" "$log_file"
+            # Has entries - prepend to array
+            echo "Warning: Using basic JSON prepend - install python3 for reliable JSON handling"
+            sed -i '' "s/\"downloads\": \[/\"downloads\": [$(cat "$temp_file"),/" "$log_file"
         fi
     fi
     
@@ -93,14 +93,58 @@ show_recent_downloads() {
     local log_file="$project_root/logs/download_metadata.json"
     
     if [ -f "$log_file" ]; then
-        echo "Recent downloads:"
-        # Simple display of the last few downloads (requires jq for proper parsing)
+        echo "Recent downloads (newest first):"
+        # Simple display of the first few downloads (requires jq for proper parsing)
         if command -v jq &> /dev/null; then
-            jq -r '.downloads[-5:] | .[] | "\(.timestamp) - \(.organism) from \(.source)"' "$log_file"
+            jq -r '.downloads[0:5] | .[] | "\(.timestamp) - \(.organism) from \(.source)"' "$log_file"
         else
             echo "Install 'jq' for formatted output, or check $log_file directly"
         fi
     else
         echo "No download history found"
+    fi
+}
+
+# Function to archive old logs
+archive_logs() {
+    local project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    local log_file="$project_root/logs/download_metadata.json"
+    local archive_dir="$project_root/logs/archive"
+    
+    if [ -f "$log_file" ]; then
+        mkdir -p "$archive_dir"
+        local archive_name="download_metadata_$(date +%Y%m%d_%H%M%S).json"
+        mv "$log_file" "$archive_dir/$archive_name"
+        echo "Logs archived to $archive_dir/$archive_name"
+        echo '{"downloads": []}' > "$log_file"
+        echo "Fresh log file created"
+    else
+        echo "No log file to archive"
+    fi
+}
+
+# Function to clean old logs (keep only last N entries)
+clean_logs() {
+    local keep_count=${1:-50}  # Default: keep last 50 entries
+    local project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    local log_file="$project_root/logs/download_metadata.json"
+    
+    if [ -f "$log_file" ] && command -v python3 &> /dev/null; then
+        python3 -c "
+import json
+
+with open('$log_file', 'r') as f:
+    data = json.load(f)
+
+# Keep only the first $keep_count entries (newest)
+data['downloads'] = data['downloads'][:$keep_count]
+
+with open('$log_file', 'w') as f:
+    json.dump(data, f, indent=2)
+
+print('Kept most recent $keep_count download entries')
+"
+    else
+        echo "Python3 required for log cleaning"
     fi
 }
