@@ -138,12 +138,12 @@ def build_knowledge_graph(triples_df_list, node_attr_df_list, node_alias_attr_df
     
     return G
 
-def visualize_knowledge_graph(G, n_degree=2):
+def visualize_knowledge_graph(G, node_n = 0, n_degree=2):
     '''Visualizes a subgraph of KG to the extent of n_degree from a random node.'''
     if G.number_of_nodes() == 0:
         print("The graph is empty. No nodes to visualize.")
         return
-    random_node = list(G.nodes())[0]
+    random_node = list(G.nodes())[node_n % G.number_of_nodes()]
     nodes_to_include = set([random_node])
     for _ in range(n_degree):
         neighbors = set()
@@ -209,8 +209,10 @@ if __name__ == "__main__":
     G = build_knowledge_graph(triples_df_list, node_attr_df_list, node_alias_attr_df_list)
 
     print(f"Knowledge graph has {G.number_of_nodes()} nodes and {G.number_of_edges()} edges.")
-    # visualize knowledge graph
-    # visualize_knowledge_graph(G, n_degree=2)
+    # visualize knowledge graph 1
+    visualize_knowledge_graph(G, node_n = 0, n_degree=2)
+    # visualize starting from another node
+    visualize_knowledge_graph(G, node_n = 1, n_degree=2)
 
     # print a specific node's attributes and connections for verification: A0A1D1W4Z0
     sample_node = list(G.nodes())[0]
