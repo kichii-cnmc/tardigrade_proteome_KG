@@ -6,11 +6,13 @@ channels:
 dependencies:
 - aiohttp
 - cd-hit
+- fair-esm
 - jupyter
 - matplotlib
 - networkx
 - pandas
 - python=3.12
+- pytorch
 - pyyaml
 - requests
 - scipy
