@@ -21,9 +21,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 # run the genome download script
-# bash src/1_collector/1_download_genomes.sh $(if [ "$TEST_MODE" = true ]; then echo "-t"; fi)
-# echo "Genome download completed."
-# echo
+bash src/1_collector/1_download_genomes.sh $(if [ "$TEST_MODE" = true ]; then echo "-t"; fi)
+echo "Genome download completed."
+echo
 
 # run the merge script on each species folders - only if proteomes were downloaded
 if [[ -f "data/1_raw/rv_proteome/rv_ncbi_proteome.faa" && -f "data/1_raw/rv_proteome/rv_uniprot_proteome.fasta" ]]; then
@@ -48,12 +48,14 @@ if [ "$TEST_MODE" = true ]; then
 fi
 
 # run the protein info pull script on each test file
-if [[ -f "data/2_merged/test_RV.tsv" ]]; then
+if [ "$TEST_MODE" = true ]; then
+    echo "Test mode enabled: Pulling protein info for test files."
+    if [[ -f "data/2_merged/test_RV.tsv" ]]; then
     python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/test_RV.tsv data/3_organized/test_RV.tsv --method batch
-fi
-
-if [[ -f "data/2_merged/test_HE.tsv" ]]; then
-    python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/test_HE.tsv data/3_organized/test_HE.tsv --method batch
+    fi
+    if [[ -f "data/2_merged/test_HE.tsv" ]]; then
+        python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/test_HE.tsv data/3_organized/test_HE.tsv --method batch
+    fi
 fi
 
 # run the protein info pull script on each full file if not in test mode
