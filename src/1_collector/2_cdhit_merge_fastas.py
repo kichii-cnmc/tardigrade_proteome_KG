@@ -22,6 +22,7 @@ def combine_fastas(fasta_input_1, fasta_input_2, combined_fasta):
 
 def identify_accession_id(id_string):
     ''' Identifies whether the ID string is from, returns 0 for UniProt, 1 for others'''
+    id_string = id_string.lstrip('>')
     if id_string.find('|') != -1:
         parts = id_string.split('|')
         if len(parts) >= 3:
