@@ -14,7 +14,7 @@ def process_string_ppi_file(input_file, output_file):
     df['protein1'] = df['protein1'].apply(isolate_protein_id)
     df['protein2'] = df['protein2'].apply(isolate_protein_id)
 
-    # removes scores less than a threshold (current: 300)
+    # removes scores less than a threshold (current: 400)
     df = df[df['combined_score'] >= 400]
 
     # divide score by 1000 to normalize between 0 and 1
