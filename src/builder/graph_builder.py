@@ -174,6 +174,8 @@ if __name__ == "__main__":
     file_path = args.file_path
     selection_percentage = args.selection_percentage
     random_seed = args.random_seed
+
+    print(f"Selection Percentage set at: {selection_percentage}%")
     
     list_of_targets = [
         ('GO_mf', 'has_molecular_function', 1),
