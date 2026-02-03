@@ -7,6 +7,7 @@ import os
 import pandas as pd
 import transformers
 import numpy as np
+import argparse
 
 def generate_df_list_of_sequences(folder_filepath, column_name = 'Sequence'):
     '''Generates a list of DataFrames containing protein sequences from TSV files in the specified folder.'''
@@ -98,59 +99,30 @@ def save_embeddings_to_file(embedding_dict, output_filepath):
     np.savez_compressed(output_filepath, **embedding_dict)
 
 if __name__ == "__main__":
-    # Load ESM-2 model
-    model, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
-    batch_converter = alphabet.get_batch_converter()
-    model.eval()  # disables dropout for deterministic results
+    parser = argparse.ArgumentParser(description="Generate ESM-2 embeddings for protein sequences.")
+    parser.add_argument("input_folder", help="Path to the folder containing TSV files with protein sequences.")
+    parser.add_argument("output_file", default = "embeddings.npz", help="Path to the output .npz file to save embeddings.")
+    parser.add_argument("--test_mode", action='store_true', help="If set, processes only a small subset of data for testing.")
+    args = parser.parse_args()
 
-    # Prepare data (first 2 sequences from ESMStructuralSplitDataset superfamily / 4)
-    data = [
-        ("protein1", "MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG"),
-        ("protein2", "KALTARQQEVFDLIRDHISQTGMPPTRAEIAQRLGFRSPNAAEEHLKALARKGVIEIVSGASRGIRLLQEE")
-    ]
-    batch_labels, batch_strs, batch_tokens = batch_converter(data)
-    batch_lens = (batch_tokens != alphabet.padding_idx).sum(1)
+    print("Loading protein sequences from TSV files...")
+    df_list = generate_df_list_of_sequences(args.input_folder)
+    print(f"Found {len(df_list)} sequence TSV files.")
 
-    # Measure time taken to generate embeddings
-    start_time = time.time()
+    print(f"Initializing ESM model...")
+    model, batch_converter = initialize_esm_model()
 
-    # Extract per-residue representations (on CPU)
-    with torch.no_grad():
-        results = model(batch_tokens, repr_layers=[33], return_contacts=True)
-    token_representations = results["representations"][33]
-
-    # Generate per-sequence representations via averaging
-    # NOTE: token 0 is always a beginning-of-sequence token, so the first residue is token 1.
-    sequence_representations = []
-    for i, tokens_len in enumerate(batch_lens):
-        sequence_representations.append(token_representations[i, 1 : tokens_len - 1].mean(0))
-
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"Time taken to generate embeddings for {len(data)} proteins: {elapsed_time:.2f} seconds")
-
-    print("Generated ESM-2 embeddings for the following proteins:")
-    for i, label in enumerate(batch_labels):
-        print(f"{label}: {sequence_representations[i].shape}")
-
-    # test build_embedding_dict function to see if it gives the same reuslts as above
-    df_test = pd.DataFrame(data, columns=['UniProt_ID', 'Sequence'])
-    df_list = [df_test]
-    embedding_dict = build_embedding_dict(df_list, model, batch_converter)
-    for label in batch_labels:
-        embedding = embedding_dict[label]
-        print(f"{label}: {embedding.shape}")
-        if label in embedding_dict:
-            emb = embedding_dict[label]
-            print(f"{label}: {emb.shape}")
-        else:
-            print(f"{label} not found in embedding dictionary.")
+    if args.test_mode:
+        print("Test mode enabled: limiting to first 20 sequences per file.")
+        df_list = [df.head(20) for df in df_list]
     
-    # check if the embeddings match
-    for i, label in enumerate(batch_labels):
-        emb1 = sequence_representations[i].cpu().numpy()
-        emb2 = embedding_dict[label]
-        if np.allclose(emb1, emb2):
-            print(f"Embeddings match for {label}.")
-        else:
-            print(f"Embeddings do NOT match for {label}.")
+    start_time = time.time()
+    print("Generating embeddings for protein sequences...")
+    embedding_dict = build_embedding_dict(df_list, model, batch_converter)
+    end_time = time.time()
+    print(f"Generated embeddings for {len(embedding_dict)} proteins in {end_time - start_time:.2f} seconds.")
+
+    print(f"Saving embeddings to {args.output_file}...")
+    save_embeddings_to_file(embedding_dict, args.output_file)
+
+    print("Embedding generation completed.")
