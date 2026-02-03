@@ -22,6 +22,7 @@ def combine_fastas(fasta_input_1, fasta_input_2, combined_fasta):
 
 def identify_accession_id(id_string):
     ''' Identifies whether the ID string is from, returns 0 for UniProt, 1 for others'''
+    id_string = id_string.lstrip('>')
     if id_string.find('|') != -1:
         parts = id_string.split('|')
         if len(parts) >= 3:
@@ -157,15 +158,21 @@ def cluster_sequences(input_fasta, output_tsv, identity_threshold=1.0):
             other_ids = []
             for idx, row in group.iterrows():
                 id_type, accession = identify_accession_id(row['identifier'])
+                if accession == "A0A1W0W9Q4":
+                    print(id_type, row['identifier'], accession)
                 accession_list.append(row['identifier'])
                 if id_type == 0:  # UniProt
                     if row['size'] > uniprot_length:
+                        if uniprot_id != "" and uniprot_id != accession:
+                            other_ids.append(uniprot_id)
                         uniprot_id = accession
                         uniprot_length = row['size']
                     else:
                         other_ids.append(accession)
                 elif id_type == 1:  # NCBI or others
                     if row['size'] > ncbi_length:
+                        if ncbi_id != "" and ncbi_id != accession:
+                            other_ids.append(ncbi_id)
                         ncbi_id = accession
                         ncbi_length = row['size']
                     else:

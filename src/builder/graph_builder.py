@@ -40,6 +40,7 @@ def collect_header_names(df_list, n = 0):
 def build_kg_target_triples_df_list(df_list, list_of_targets):
     '''List version of build_kg_target_triples_df, used to process multiple targets.'''
     all_triples_df = []
+    failed_targets_ct = len(list_of_targets)
     target_names = [target[0] for target in list_of_targets]
     df_names = collect_header_names(df_list, 1)
     for i, df in enumerate(df_list):
@@ -48,11 +49,15 @@ def build_kg_target_triples_df_list(df_list, list_of_targets):
             target, edge_type, weight = list_of_targets[target_index]
             triples_df = build_kg_target_triples_df(df, target, edge_type, weight)
             all_triples_df.append(triples_df)
+            failed_targets_ct -= 1
+    if failed_targets_ct > 0:
+        print(f"Warning: {failed_targets_ct} items in list_of_targets were not found in the df_list")
     return all_triples_df
 
 def build_kg_node_attr_df_list(df_list, list_of_node_attr):
     '''List version of build_kg_node_attr_df, used to process multiple node attributes.'''
     all_nodes_df = []
+    failed_targets_ct = len(list_of_node_attr)
     node_attr_names = [node_attr[0] for node_attr in list_of_node_attr]
     df_names = collect_header_names(df_list, 1)
     for i, df in enumerate(df_list):
@@ -61,12 +66,16 @@ def build_kg_node_attr_df_list(df_list, list_of_node_attr):
             id_column, node_attr_value = list_of_node_attr[node_attr_index]
             nodes_df = build_kg_node_attr_df(df, id_column, node_attr_value)
             all_nodes_df.append(nodes_df)
+            failed_targets_ct -= 1 
+    if failed_targets_ct > 0:
+        print(f"Warning: {failed_targets_ct} items in list_of_node_attr were not found in the df_list")
     return all_nodes_df
 
 def build_kg_node_alias_attr_df_list(df_list, list_of_node_alias_attr):
     '''List version of build_kg_node_alias_attr_df, used to process multiple alias attributes.'''
     all_alias_df = []
-    alias_attr_names = [alias_attr[0] for alias_attr in list_of_node_alias_attr]
+    failed_targets_ct = len(list_of_node_alias_attr)
+    alias_attr_names = [alias_attr_item[1] for alias_attr_item in list_of_node_alias_attr]
     df_names = collect_header_names(df_list, 1)
     for i, df in enumerate(df_list):
         if df_names[i] in alias_attr_names:
@@ -74,6 +83,10 @@ def build_kg_node_alias_attr_df_list(df_list, list_of_node_alias_attr):
             id_column, alias_attr_column = list_of_node_alias_attr[alias_attr_index]
             alias_df = build_kg_node_alias_attr_df(df, id_column, alias_attr_column)
             all_alias_df.append(alias_df)
+            failed_targets_ct -= 1
+            print(f"Built alias attribute DataFrame for {df_names[i]}")
+    if failed_targets_ct > 0:
+        print(f"Warning: {failed_targets_ct} items in list_of_node_alias_attr were not found in the df_list")
     return all_alias_df
 
 def build_kg_target_triples_df(df, target, edge_type = None, weight = None):
@@ -119,24 +132,28 @@ def build_knowledge_graph(triples_df_list, node_attr_df_list, node_alias_attr_df
     '''Builds a NetworkX knowledge graph from triples and node attributes.'''
     G = nx.MultiDiGraph()
     
-    # Add triples as edges
-    for triples_df in triples_df_list:
-        for index, row in triples_df.iterrows():
-            G.add_edge(row['source'], row['target'], edge_type=row['edge_type'], weight=row['weight'])
-    
-    # Add node attributes
+    # First, add all nodes from node attributes to ensure they exist
     for node_attr_df in node_attr_df_list:
         for index, row in node_attr_df.iterrows():
+            if row['id'] not in G.nodes:
+                G.add_node(row['id'])
             if 'node_attr' not in G.nodes[row['id']]:
                 G.nodes[row['id']]['node_attr'] = []
             G.nodes[row['id']]['node_attr'].append(row['node_attr'])
     
-    # Add alias attributes
+    # Add alias attributes (also ensures nodes exist)
     for alias_attr_df in node_alias_attr_df_list:
         for index, row in alias_attr_df.iterrows():
+            if row['id'] not in G.nodes:
+                G.add_node(row['id'])
             if 'alias_attr' not in G.nodes[row['id']]:
                 G.nodes[row['id']]['alias_attr'] = []
             G.nodes[row['id']]['alias_attr'].append(row['alias_attr'])
+    
+    # Then add triples as edges
+    for triples_df in triples_df_list:
+        for index, row in triples_df.iterrows():
+            G.add_edge(row['source'], row['target'], edge_type=row['edge_type'], weight=row['weight'])
     
     return G
 
@@ -162,6 +179,11 @@ def visualize_knowledge_graph(G, node_n = 0, n_degree=2):
     plt.title(f"Subgraph of Knowledge Graph (n_degree={n_degree})")
     plt.show()
 
+def save_knowledge_graph(G, output_file):
+    '''Saves the knowledge graph to a file in GraphML format.'''
+    nx.write_graphml(G, output_file)
+    print(f"Knowledge graph saved to {output_file}")
+
 if __name__ == "__main__":
     # CLI
     parser = argparse.ArgumentParser(description="Build a knowledge graph from protein info TSV file or folder.")
@@ -174,6 +196,8 @@ if __name__ == "__main__":
     file_path = args.file_path
     selection_percentage = args.selection_percentage
     random_seed = args.random_seed
+
+    print(f"Selection Percentage set at: {selection_percentage}%")
     
     list_of_targets = [
         ('GO_mf', 'has_molecular_function', 1),
@@ -215,13 +239,17 @@ if __name__ == "__main__":
     # visualize knowledge graph 1
     visualize_knowledge_graph(G, node_n = 0, n_degree=2)
     # visualize starting from another node
-    visualize_knowledge_graph(G, node_n = 1, n_degree=2)
+    # visualize_knowledge_graph(G, node_n = 1, n_degree=2)
 
     # print a specific node's attributes and connections for verification: A0A1D1W4Z0
     sample_node = list(G.nodes())[0]
     print(f"Sample node: {sample_node}")
     print(f"Attributes: {G.nodes[sample_node]}")
     print(f"Connections: {list(G.edges(sample_node, data=True))}")
+
+    # save knowledge graph
+    output_file = "knowledge_graph.graphml"
+    save_knowledge_graph(G, output_file)
     
 
 

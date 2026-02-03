@@ -6,7 +6,7 @@ def isolate_protein_id(protein_string):
     '''Isolates the protein ID from a STRING protein string.'''
     return protein_string.split('.')[1] if '.' in protein_string else protein_string
 
-def process_string_ppi_file(input_file, output_file):
+def process_string_ppi_file(input_file, output_file, merged_ids_file=None):
     '''Processes a STRING PPI text file and saves it as a TSV file.'''
     df = pd.read_csv(input_file, sep=' ')
 
@@ -14,7 +14,7 @@ def process_string_ppi_file(input_file, output_file):
     df['protein1'] = df['protein1'].apply(isolate_protein_id)
     df['protein2'] = df['protein2'].apply(isolate_protein_id)
 
-    # removes scores less than a threshold (current: 300)
+    # removes scores less than a threshold (current: 400)
     df = df[df['combined_score'] >= 400]
 
     # divide score by 1000 to normalize between 0 and 1
@@ -23,15 +23,40 @@ def process_string_ppi_file(input_file, output_file):
     # rename columns to match KG building expectations
     df = df.rename(columns={'protein1': 'PPI_source', 'protein2': 'PPI_target', 'combined_score': 'score'})
 
+    # apply any conversion of merged IDs
+    if merged_ids_file:
+        conversion_dict = build_merged_ids_conversion_dict(merged_ids_file)
+        df = convert_merged_ids_in_ppi(df, conversion_dict)
+
     df.to_csv(output_file, sep='\t', index=False)
+
+def build_merged_ids_conversion_dict(input_file):
+    '''Builds a dictionary to convert merged UniProt IDs to their current IDs.'''
+    conversion_dict = {}
+    merged_df = pd.read_csv(input_file, sep='\t')
+    for index, row in merged_df.iterrows():
+        current_id = row['UniProt_ID']
+        merged_ids = str(row['Other_IDs']).split(';') if pd.notna(row['Other_IDs']) else []
+        for merged_id in merged_ids:
+            merged_id = merged_id.strip()
+            if merged_id:
+                conversion_dict[merged_id] = current_id
+    return conversion_dict
+
+def convert_merged_ids_in_ppi(df, conversion_dict):
+    '''Converts merged UniProt IDs in the PPI DataFrame to their current IDs using the provided conversion dictionary.'''
+    df['PPI_source'] = df['PPI_source'].apply(lambda x: conversion_dict.get(x, x))
+    df['PPI_target'] = df['PPI_target'].apply(lambda x: conversion_dict.get(x, x))
+    return df
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Process STRING PPI data file into TSV format.')
     parser.add_argument('input_file', type=str, help='Path to the input STRING PPI text file.')
     parser.add_argument('output_file', type=str, help='Path to the output TSV file.')
+    parser.add_argument('--merge', type=str, default=None, help='Path to the merged UniProt IDs TSV file.')
     args = parser.parse_args()
 
     print("Processing STRING PPI data...")
-    process_string_ppi_file(args.input_file, args.output_file)
+    process_string_ppi_file(args.input_file, args.output_file, args.merge)
     print(f"Processed STRING PPI data saved to {args.output_file}.")
