@@ -179,6 +179,11 @@ def visualize_knowledge_graph(G, node_n = 0, n_degree=2):
     plt.title(f"Subgraph of Knowledge Graph (n_degree={n_degree})")
     plt.show()
 
+def save_knowledge_graph(G, output_file):
+    '''Saves the knowledge graph to a file in GraphML format.'''
+    nx.write_graphml(G, output_file)
+    print(f"Knowledge graph saved to {output_file}")
+
 if __name__ == "__main__":
     # CLI
     parser = argparse.ArgumentParser(description="Build a knowledge graph from protein info TSV file or folder.")
@@ -241,6 +246,10 @@ if __name__ == "__main__":
     print(f"Sample node: {sample_node}")
     print(f"Attributes: {G.nodes[sample_node]}")
     print(f"Connections: {list(G.edges(sample_node, data=True))}")
+
+    # save knowledge graph
+    output_file = "knowledge_graph.graphml"
+    save_knowledge_graph(G, output_file)
     
 
 
