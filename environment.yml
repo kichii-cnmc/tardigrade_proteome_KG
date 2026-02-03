@@ -17,4 +17,5 @@ dependencies:
 - requests
 - scipy
 - setuptools
+- transformers
 
