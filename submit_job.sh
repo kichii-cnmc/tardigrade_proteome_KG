@@ -15,6 +15,7 @@ mkdir -p logs
 
 # Initialize micromamba environment
 module load micromamba
+module load cuda # Load CUDA module if required for GPU support
 eval "$(micromamba shell hook --shell bash)"
 micromamba activate tardigrade_proteome_KG_env
 
