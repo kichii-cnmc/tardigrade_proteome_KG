@@ -25,9 +25,15 @@ def initialize_esm_model(model_name='esm2_t33_650M_UR50D'):
     model, alphabet = esm.pretrained.load_model_and_alphabet(model_name)
     batch_converter = alphabet.get_batch_converter()
     model.eval()  # disables dropout for deterministic results
-    return model, batch_converter
 
-def get_long_sequence_embedding(sequence, model, batch_converter):
+    # move to GPU if available
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    print(f"Using device: {device}")
+
+    return model, batch_converter, device
+
+def get_long_sequence_embedding(sequence, model, batch_converter, device):
     '''Generates an embedding for a long protein sequence using a sliding window approach.'''
     # Hard limit for ESM-2
     max_len = 1022 # 1024 minus <cls> and <eos>
@@ -39,7 +45,7 @@ def get_long_sequence_embedding(sequence, model, batch_converter):
         batch_labels, batch_strs, batch_tokens = batch_converter(data)
         
         with torch.no_grad():
-            results = model(batch_tokens, repr_layers=[33])
+            results = model(batch_tokens.to(device), repr_layers=[33])
         token_representations = results["representations"][33]
         # Remove special tokens and take mean
         return token_representations[0, 1:-1, :].mean(dim=0).cpu().numpy()
@@ -57,7 +63,7 @@ def get_long_sequence_embedding(sequence, model, batch_converter):
         batch_labels, batch_strs, batch_tokens = batch_converter(data)
         
         with torch.no_grad():
-            results = model(batch_tokens, repr_layers=[33])
+            results = model(batch_tokens.to(device), repr_layers=[33])
         
         token_representations = results["representations"][33]
         # remove special tokens and store residue embeddings
@@ -71,14 +77,14 @@ def get_long_sequence_embedding(sequence, model, batch_converter):
         batch_labels, batch_strs, batch_tokens = batch_converter(data)
         
         with torch.no_grad():
-            results = model(batch_tokens, repr_layers=[33])
+            results = model(batch_tokens.to(device), repr_layers=[33])
         token_representations = results["representations"][33]
         return token_representations[0, 1:-1, :].mean(dim=0).cpu().numpy()
     
     combined = torch.cat(residue_embeddings, dim=0)
     return combined.mean(dim=0).numpy()
 
-def build_embedding_dict(df_list, model, batch_converter, sequence_column='Sequence', id_column='UniProt_ID'):
+def build_embedding_dict(df_list, model, batch_converter, device, sequence_column='Sequence', id_column='UniProt_ID'):
     '''Builds a dictionary of protein embeddings from a list of DataFrames.'''
     embedding_dict = {}
     for df in df_list:
@@ -90,7 +96,7 @@ def build_embedding_dict(df_list, model, batch_converter, sequence_column='Seque
             
             print(f"Processing {protein_id}...")
             # Generate embedding
-            embedding = get_long_sequence_embedding(sequence, model, batch_converter)
+            embedding = get_long_sequence_embedding(sequence, model, batch_converter, device)
             embedding_dict[protein_id] = embedding
     return embedding_dict
 
@@ -110,7 +116,7 @@ if __name__ == "__main__":
     print(f"Found {len(df_list)} sequence TSV files.")
 
     print(f"Initializing ESM model...")
-    model, batch_converter = initialize_esm_model()
+    model, batch_converter, device = initialize_esm_model()
 
     if args.test_mode:
         print("Test mode enabled: limiting to first 20 sequences per file.")
@@ -118,7 +124,7 @@ if __name__ == "__main__":
     
     start_time = time.time()
     print("Generating embeddings for protein sequences...")
-    embedding_dict = build_embedding_dict(df_list, model, batch_converter)
+    embedding_dict = build_embedding_dict(df_list, model, batch_converter, device=device)
     end_time = time.time()
     print(f"Generated embeddings for {len(embedding_dict)} proteins in {end_time - start_time:.2f} seconds.")
 
