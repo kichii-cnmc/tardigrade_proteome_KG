@@ -9,6 +9,7 @@ import transformers
 import numpy as np
 import argparse
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import Normalizer
 
 def generate_df_list_of_sequences(folder_filepath, column_name = 'Sequence'):
     '''Generates a list of DataFrames containing protein sequences from TSV files in the specified folder.'''
@@ -105,8 +106,13 @@ def apply_pca_reduction(embedding_dict):
     '''Applies PCA to reduce the dimensionality of the embeddings in a dict.'''
     protein_ids = list(embedding_dict.keys())
     embeddings = np.array(list(embedding_dict.values()))
-    pca = PCA(n_components='mle')  # use MLE to automatically determine the number of components to retain 95% variance
-    reduced_embeddings = pca.fit_transform(embeddings)
+
+    # normalize embeddings before PCA
+    normalizer = Normalizer()
+    normalized_embeddings = normalizer.fit_transform(embeddings)
+
+    pca = PCA(n_components='mle')  # use MLE to automatically determine the number of components to retain 90% variance
+    reduced_embeddings = pca.fit_transform(normalized_embeddings)
     print(f"PCA reduced embeddings from {embeddings.shape[1]} to {reduced_embeddings.shape[1]} dimensions.")
     return dict(zip(protein_ids, reduced_embeddings))
 
@@ -129,8 +135,8 @@ if __name__ == "__main__":
     model, batch_converter, device = initialize_esm_model()
 
     if args.test_mode:
-        print("Test mode enabled: limiting to first 20 sequences per file.")
-        df_list = [df.head(20) for df in df_list]
+        print("Test mode enabled: limiting to first 650 sequences per file.")
+        df_list = [df.head(650) for df in df_list]
     
     start_time = time.time()
     print("Generating embeddings for protein sequences...")
