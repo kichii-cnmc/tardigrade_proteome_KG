@@ -8,6 +8,7 @@ import pandas as pd
 import transformers
 import numpy as np
 import argparse
+from sklearn.decomposition import PCA
 
 def generate_df_list_of_sequences(folder_filepath, column_name = 'Sequence'):
     '''Generates a list of DataFrames containing protein sequences from TSV files in the specified folder.'''
@@ -100,6 +101,15 @@ def build_embedding_dict(df_list, model, batch_converter, device, sequence_colum
             embedding_dict[protein_id] = embedding
     return embedding_dict
 
+def apply_pca_reduction(embedding_dict):
+    '''Applies PCA to reduce the dimensionality of the embeddings in a dict.'''
+    protein_ids = list(embedding_dict.keys())
+    embeddings = np.array(list(embedding_dict.values()))
+    pca = PCA(n_components='mle')  # use MLE to automatically determine the number of components to retain 95% variance
+    reduced_embeddings = pca.fit_transform(embeddings)
+    print(f"PCA reduced embeddings from {embeddings.shape[1]} to {reduced_embeddings.shape[1]} dimensions.")
+    return dict(zip(protein_ids, reduced_embeddings))
+
 def save_embeddings_to_file(embedding_dict, output_filepath):
     '''Saves the embedding dictionary to a file in NumPy .npz format.'''
     np.savez_compressed(output_filepath, **embedding_dict)
@@ -128,7 +138,10 @@ if __name__ == "__main__":
     end_time = time.time()
     print(f"Generated embeddings for {len(embedding_dict)} proteins in {end_time - start_time:.2f} seconds.")
 
+    print("Applying PCA for dimensionality reduction...")
+    reduced_embedding_dict = apply_pca_reduction(embedding_dict)
+
     print(f"Saving embeddings to {args.output_file}...")
-    save_embeddings_to_file(embedding_dict, args.output_file)
+    save_embeddings_to_file(reduced_embedding_dict, args.output_file)
 
     print("Embedding generation completed.")

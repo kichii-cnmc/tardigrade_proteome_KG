@@ -15,6 +15,7 @@ dependencies:
 - pytorch
 - pyyaml
 - requests
+- scikit-learn
 - scipy
 - setuptools
 - transformers
