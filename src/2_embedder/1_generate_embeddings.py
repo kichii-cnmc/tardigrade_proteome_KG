@@ -10,6 +10,7 @@ import numpy as np
 import argparse
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import Normalizer
+import matplotlib.pyplot as plt
 
 def generate_df_list_of_sequences(folder_filepath, column_name = 'Sequence'):
     '''Generates a list of DataFrames containing protein sequences from TSV files in the specified folder.'''
@@ -102,7 +103,7 @@ def build_embedding_dict(df_list, model, batch_converter, device, sequence_colum
             embedding_dict[protein_id] = embedding
     return embedding_dict
 
-def apply_pca_reduction(embedding_dict):
+def apply_pca_reduction(embedding_dict, n_components = 100):
     '''Applies PCA to reduce the dimensionality of the embeddings in a dict.'''
     protein_ids = list(embedding_dict.keys())
     embeddings = np.array(list(embedding_dict.values()))
@@ -111,12 +112,30 @@ def apply_pca_reduction(embedding_dict):
     normalizer = Normalizer()
     normalized_embeddings = normalizer.fit_transform(embeddings)
 
-    pca = PCA(n_components='mle')  # use MLE to automatically determine the number of components to retain 90% variance
+    pca = PCA(n_components=n_components)  # use MLE to automatically determine the number of components to retain 90% variance
     reduced_embeddings = pca.fit_transform(normalized_embeddings)
     print(f"PCA reduced embeddings from {embeddings.shape[1]} to {reduced_embeddings.shape[1]} dimensions.")
     # change float precision to save space
     reduced_embeddings = reduced_embeddings.astype(np.float16)
     return dict(zip(protein_ids, reduced_embeddings))
+
+def find_optimal_number_of_components(embedding_dict):
+    '''Determines the optimal number of PCA components by generating a scree plot and finding the elbow point.'''
+    protein_ids = list(embedding_dict.keys())
+    embeddings = np.array(list(embedding_dict.values()))
+    pca = PCA().fit(embeddings)
+    plt.figure()
+    plt.plot(np.cumsum(pca.explained_variance_ratio_), marker='o')
+    plt.title('Cumulative Explained Variance by PCA Components')
+    plt.xlabel('Number of Components')
+    plt.ylabel('Cumulative Explained Variance')
+    plt.grid()
+    plt.savefig('pca_scree_plot.png')
+    plt.show()
+    # find the elbow point where the explained variance starts to level off
+    optimal_components = np.argmax(np.cumsum(pca.explained_variance_ratio_) >= 0.90) + 1  # +1 because index starts at 0
+    print(f"Optimal number of PCA components to retain 90% variance: {optimal_components}")
+    return optimal_components
 
 def save_embeddings_to_file(embedding_dict, output_filepath):
     '''Saves the embedding dictionary to a file in NumPy .npz format.'''
@@ -137,8 +156,8 @@ if __name__ == "__main__":
     model, batch_converter, device = initialize_esm_model()
 
     if args.test_mode:
-        print("Test mode enabled: limiting to first 650 sequences per file.")
-        df_list = [df.head(650) for df in df_list]
+        print("Test mode enabled: limiting to first 10 sequences per file.")
+        df_list = [df.head(10) for df in df_list]
     
     start_time = time.time()
     print("Generating embeddings for protein sequences...")
@@ -147,9 +166,10 @@ if __name__ == "__main__":
     print(f"Generated embeddings for {len(embedding_dict)} proteins in {end_time - start_time:.2f} seconds.")
 
     print("Applying PCA for dimensionality reduction...")
-    reduced_embedding_dict = apply_pca_reduction(embedding_dict)
+    optimal_components = find_optimal_number_of_components(embedding_dict)  # optional: find optimal components and show scree plot
+    reduced_embedding_dict = apply_pca_reduction(embedding_dict, n_components=optimal_components)
 
     print(f"Saving embeddings to {args.output_file}...")
-    save_embeddings_to_file(reduced_embedding_dict, args.output_file)
+    # save_embeddings_to_file(reduced_embedding_dict, args.output_file)
 
     print("Embedding generation completed.")
