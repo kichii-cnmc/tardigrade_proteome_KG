@@ -114,6 +114,8 @@ def apply_pca_reduction(embedding_dict):
     pca = PCA(n_components='mle')  # use MLE to automatically determine the number of components to retain 90% variance
     reduced_embeddings = pca.fit_transform(normalized_embeddings)
     print(f"PCA reduced embeddings from {embeddings.shape[1]} to {reduced_embeddings.shape[1]} dimensions.")
+    # change float precision to save space
+    reduced_embeddings = reduced_embeddings.astype(np.float16)
     return dict(zip(protein_ids, reduced_embeddings))
 
 def save_embeddings_to_file(embedding_dict, output_filepath):
