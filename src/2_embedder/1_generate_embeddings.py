@@ -131,7 +131,7 @@ def find_optimal_number_of_components(embedding_dict):
     plt.ylabel('Cumulative Explained Variance')
     plt.grid()
     plt.savefig('pca_scree_plot.png')
-    plt.show()
+    #plt.show()
     # find the elbow point where the explained variance starts to level off
     optimal_components = np.argmax(np.cumsum(pca.explained_variance_ratio_) >= 0.90) + 1  # +1 because index starts at 0
     print(f"Optimal number of PCA components to retain 90% variance: {optimal_components}")
@@ -156,8 +156,8 @@ if __name__ == "__main__":
     model, batch_converter, device = initialize_esm_model()
 
     if args.test_mode:
-        print("Test mode enabled: limiting to first 10 sequences per file.")
-        df_list = [df.head(10) for df in df_list]
+        print("Test mode enabled: limiting to first 20 sequences per file.")
+        df_list = [df.head(50) for df in df_list]
     
     start_time = time.time()
     print("Generating embeddings for protein sequences...")
