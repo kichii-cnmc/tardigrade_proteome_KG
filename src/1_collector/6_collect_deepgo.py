@@ -86,7 +86,7 @@ def query_deepgoplus(id_sequence_set, output_file="deepgoplus_predictions.tsv", 
     '''Queries DeepGOPlus API for GO term predictions in batches, continuously appends to TSV file as results are received.'''
     
     url_create = "https://deepgo.cbrc.kaust.edu.sa/deepgo/api/create"
-    batch_size = 10
+    batch_size = 100
     id_sequence_list = list(id_sequence_set)
     
     for i in range(0, len(id_sequence_list), batch_size):
@@ -116,7 +116,10 @@ def query_deepgoplus(id_sequence_set, output_file="deepgoplus_predictions.tsv", 
                 
         except requests.exceptions.RequestException as e:
             print(f"Error processing batch {i//batch_size + 1}: {e}")
-            continue
+            # save proteins in the fiailed batch for logging            
+            failed_proteins = [protein_id for protein_id, _ in sequences]
+            with open("logs/failed_deepgo_batches.log", "a") as log_file:
+                log_file.write(f"Batch {i//batch_size + 1} failed for proteins: {', '.join(failed_proteins)}\n")
         except json.JSONDecodeError as e:
             print(f"Invalid JSON response for batch {i//batch_size + 1}: {e}")
             continue
@@ -166,7 +169,12 @@ if __name__ == "__main__":
         all_id_sequence_set.update(id_sequence_set)
 
     if args.test_mode:
-        all_id_sequence_set = set(list(all_id_sequence_set)[:500])
+        # Sort by protein ID for consistent, deterministic selection
+        all_id_sequence_list = sorted(list(all_id_sequence_set), key=lambda x: x[0])  # Sort by protein_id (first element)
+        test_sequences = all_id_sequence_list[:100]
+        all_id_sequence_set = set(test_sequences)
+        print(f"Test mode: Using first 100 sequences (sorted by protein ID)")
+        print(f"First sequence ID: {test_sequences[0][0]}")  # Show which protein is first
 
     start_time = time.time()
     query_deepgoplus(all_id_sequence_set, output_file=args.output_file, version_number=args.version_number)
