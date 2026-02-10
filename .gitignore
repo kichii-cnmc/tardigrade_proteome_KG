@@ -1,5 +1,8 @@
 # Datafiles
 *.graphml
+*.csv
+*.png
+*.npz
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
