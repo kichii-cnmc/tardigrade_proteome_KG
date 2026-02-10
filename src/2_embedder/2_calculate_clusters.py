@@ -10,12 +10,14 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+from sklearn import metrics
+from scipy.spatial.distance import cdist
 
 def extract_embeddings_from_npz(npz_filepath):
     '''Extracts embeddings from a .npz file and returns them as a dictionary.'''
     data = np.load(npz_filepath, allow_pickle=True)
     embedding_dict = {key: data[key] for key in data.files}
-    print(embedding_dict.keys())  # print keys to verify contents
+    # print(embedding_dict.keys())  # print keys to verify contents
     return embedding_dict
 
 def calculate_clusters(embedding_dict, n_clusters = 10):
@@ -38,7 +40,7 @@ def calculate_silhouette_score(embedding_dict, cluster_labels):
     score = silhouette_score(embeddings, labels)
     return score
 
-def determine_optimal_clusters(embedding_dict, min_clusters = 2,max_clusters=20, increment = 1):
+def determine_optimal_clusters_ss(embedding_dict, min_clusters = 2,max_clusters=20, increment = 1):
     '''Determines the optimal number of clusters using silhouette scores.'''
     embeddings = np.array(list(embedding_dict.values()))
     silhouette_scores = []
@@ -56,7 +58,7 @@ def determine_optimal_clusters(embedding_dict, min_clusters = 2,max_clusters=20,
     plt.xlabel('Number of Clusters')
     plt.ylabel('Silhouette Score')
     plt.grid()
-    plt.show()
+    #plt.show()
 
     optimal_clusters = cluster_range[np.argmax(silhouette_scores)]
 
@@ -67,6 +69,36 @@ def determine_optimal_clusters(embedding_dict, min_clusters = 2,max_clusters=20,
     })
     silhouette_df.to_csv('silhouette_scores.csv', index=False)
 
+    return optimal_clusters
+
+def determine_optimal_clusters_em(embedding_dict, min_clusters = 2,max_clusters=20, increment = 1):
+    '''Determines the optimal number of clusters using the elbow method.'''
+    embeddings = np.array(list(embedding_dict.values()))
+    distortions = []
+    inertia_scores = []
+    cluster_range = range(min_clusters, max_clusters + 1, increment)
+    for n_clusters in cluster_range:
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        kmeans.fit(embeddings)
+        distortions.append(sum(np.min(cdist(embeddings, kmeans.cluster_centers_, 'euclidean'), axis=1)) / embeddings.shape[0])
+        inertia_scores.append(kmeans.inertia_)
+    # Plotting the elbow method results
+    plt.figure()
+    plt.plot(cluster_range, distortions, marker='o')
+    plt.title('Elbow Method: Distortion vs Number of Clusters')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Distortion')
+    plt.grid()
+    plt.savefig('elbow_method_distortion.png')
+    plt.figure()
+    plt.plot(cluster_range, inertia_scores, marker='o')
+    plt.title('Elbow Method: Inertia vs Number of Clusters')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Inertia')
+    plt.grid()
+    plt.savefig('elbow_method_inertia.png')
+    # Determine optimal clusters using the elbow method (looking for the "elbow" point)
+    optimal_clusters = cluster_range[np.argmin(np.diff(distortions))]
     return optimal_clusters
 
 if __name__ == "__main__":
@@ -81,16 +113,11 @@ if __name__ == "__main__":
     print(f"Loading embeddings from {args.input_file}...")
     embedding_dict = extract_embeddings_from_npz(args.input_file)
     print(f"Loaded {len(embedding_dict)} embeddings.")
-    print("Determining optimal number of clusters using silhouette scores...")
-    optimal_cluster_ct = determine_optimal_clusters(embedding_dict, args.min_clusters, args.max_clusters, args.increment)
-    print(f"Optimal number of clusters determined to be: {optimal_cluster_ct}")
-    embedding_dict = extract_embeddings_from_npz(args.input_file)
-    cluster_labels, cluster_centers = calculate_clusters(embedding_dict, n_clusters=optimal_cluster_ct)
-    silhouette_score_value = calculate_silhouette_score(embedding_dict, cluster_labels)
-    print(f"Silhouette Score for {optimal_cluster_ct} clusters: {silhouette_score_value:.4f}")
+    optimal_cluster_ct_em = determine_optimal_clusters_ss(embedding_dict, args.min_clusters, args.max_clusters, args.increment)
+    print(f"Optimal number of clusters determined by elbow method: {optimal_cluster_ct_em}")
 
-    save_cluster_assignments(cluster_labels, 'cluster_assignments.csv')
-    print("Cluster assignments saved to cluster_assignments.csv")
+    # save_cluster_assignments(cluster_labels, 'cluster_assignments.csv')
+    # print("Cluster assignments saved to cluster_assignments.csv")
 
 
 
