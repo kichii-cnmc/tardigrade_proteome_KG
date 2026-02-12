@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
     if args.test_mode:
         print("Test mode enabled: limiting to first 20 sequences per file.")
-        df_list = [df.head(50) for df in df_list]
+        df_list = [df.head(20) for df in df_list]
     
     start_time = time.time()
     print("Generating embeddings for protein sequences...")
@@ -170,6 +170,6 @@ if __name__ == "__main__":
     reduced_embedding_dict = apply_pca_reduction(embedding_dict, n_components=optimal_components)
 
     print(f"Saving embeddings to {args.output_file}...")
-    # save_embeddings_to_file(reduced_embedding_dict, args.output_file)
+    save_embeddings_to_file(reduced_embedding_dict, args.output_file)
 
     print("Embedding generation completed.")
