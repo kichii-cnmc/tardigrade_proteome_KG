@@ -35,6 +35,8 @@ def form_fasta_string(id_sequence_set):
     '''Forms a FASTA formatted string from the set of (protein_ID, sequence) tuples'''
     fasta_string = ""
     for protein_id, sequence in id_sequence_set:
+        if protein_id == "0" or pd.isna(protein_id) or pd.isna(sequence):
+            continue  # Skip invalid entries
         fasta_string += f">{protein_id}\n{sequence}\n"
     return fasta_string
 
@@ -115,11 +117,48 @@ def query_deepgoplus(id_sequence_set, output_file="deepgoplus_predictions.tsv", 
             process_deepgo_to_tsv(job_data, output_file=output_file)  # Process initial response for any immediate results
                 
         except requests.exceptions.RequestException as e:
-            print(f"Error processing batch {i//batch_size + 1}: {e}")
-            # save proteins in the fiailed batch for logging            
-            failed_proteins = [protein_id for protein_id, _ in sequences]
-            with open("logs/failed_deepgo_batches.log", "a") as log_file:
-                log_file.write(f"Batch {i//batch_size + 1} failed for proteins: {', '.join(failed_proteins)}\n")
+            print(f"Request failed for batch {i//batch_size + 1}: {e}")
+            
+            # Retry with exponential backoff
+            max_retries = 3
+            for retry_count in range(1, max_retries + 1):
+                wait_time = 10 * (2 ** (retry_count - 1))  # 10, 20, 40 seconds
+                print(f"Retrying batch {i//batch_size + 1} in {wait_time} seconds (attempt {retry_count}/{max_retries})...")
+                time.sleep(wait_time)
+                
+                try:
+                    response = requests.post(url_create, json=payload, timeout=60)
+                    response.raise_for_status()
+                    job_data = response.json()
+                    process_deepgo_to_tsv(job_data, output_file=output_file)
+                    print(f"Batch {i//batch_size + 1} succeeded on retry attempt {retry_count}")
+                    break  # Success, exit retry loop
+                except requests.exceptions.RequestException as retry_e:
+                    print(f"Retry attempt {retry_count} failed: {retry_e}")
+                    if retry_count == max_retries:
+                        # All retries exhausted, log and continue
+                        failed_proteins = [protein_id for protein_id, _ in sequences]
+                        os.makedirs("logs", exist_ok=True)
+                        with open("logs/failed_deepgo_batches.log", "a") as log_file:
+                            log_file.write(f"Batch {i//batch_size + 1} failed after {max_retries} retries. "
+                                f"Proteins: {', '.join(failed_proteins)}. Error: {e}\n")
+                        print(f"Batch {i//batch_size + 1} permanently failed after {max_retries} retries")
+                except json.JSONDecodeError as retry_e:
+                    print(f"Invalid JSON response on retry {retry_count}: {retry_e}")
+                    if retry_count == max_retries:
+                        failed_proteins = [protein_id for protein_id, _ in sequences]
+                        os.makedirs("logs", exist_ok=True)
+                        with open("logs/failed_deepgo_batches.log", "a") as log_file:
+                            log_file.write(f"Batch {i//batch_size + 1} failed with JSON decode error after {max_retries} retries. "
+                                f"Proteins: {', '.join(failed_proteins)}\n")
+                except Exception as retry_e:
+                    print(f"Unexpected error on retry {retry_count}: {retry_e}")
+                    if retry_count == max_retries:
+                        failed_proteins = [protein_id for protein_id, _ in sequences]
+                        os.makedirs("logs", exist_ok=True)
+                        with open("logs/failed_deepgo_batches.log", "a") as log_file:
+                            log_file.write(f"Batch {i//batch_size + 1} failed with unexpected error after {max_retries} retries. "
+                                f"Proteins: {', '.join(failed_proteins)}. Error: {retry_e}\n")
         except json.JSONDecodeError as e:
             print(f"Invalid JSON response for batch {i//batch_size + 1}: {e}")
             continue
