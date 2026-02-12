@@ -112,7 +112,7 @@ if __name__ == "__main__":
 
     print(f"Loading embeddings from {args.input_file}...")
     embedding_dict = extract_embeddings_from_npz(args.input_file)
-    print(f"Loaded {len(embedding_dict)} embeddings.")
+    print(f"Loaded {len(embedding_dict)} embeddings at {len(embedding_dict[next(iter(embedding_dict))])} dimensions.")
     optimal_cluster_ct_em = determine_optimal_clusters_ss(embedding_dict, args.min_clusters, args.max_clusters, args.increment)
     print(f"Optimal number of clusters determined by elbow method: {optimal_cluster_ct_em}")
 
