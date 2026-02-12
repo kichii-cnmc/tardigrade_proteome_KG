@@ -10,8 +10,9 @@
 #SBATCH --mem=16G
 
 # Initialize micromamba environment
+module load micromamba
 eval "$(micromamba shell hook --shell bash)"
 micromamba activate tardigrade_proteome_KG_env
 
-# Run the collector pipeline script
-bash scripts/1_collector_pipeline.sh
+# run
+python3 src/1_collector/6_collect_deepgo.py data/3_organized/
