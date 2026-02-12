@@ -90,6 +90,10 @@ def query_deepgoplus(id_sequence_set, output_file="deepgoplus_predictions.tsv", 
     url_create = "https://deepgo.cbrc.kaust.edu.sa/deepgo/api/create"
     batch_size = 100
     id_sequence_list = list(id_sequence_set)
+
+    # failure tracking
+    consective_failures = 0
+    max_consecutive_failures = 5
     
     for i in range(0, len(id_sequence_list), batch_size):
         sequences = id_sequence_list[i:i+batch_size]
@@ -115,9 +119,11 @@ def query_deepgoplus(id_sequence_set, output_file="deepgoplus_predictions.tsv", 
             
             job_data = response.json()
             process_deepgo_to_tsv(job_data, output_file=output_file)  # Process initial response for any immediate results
+            consective_failures = 0  # Reset on success
                 
         except requests.exceptions.RequestException as e:
             print(f"Request failed for batch {i//batch_size + 1}: {e}")
+            consective_failures += 1
             
             # Retry with exponential backoff
             max_retries = 3
@@ -132,6 +138,7 @@ def query_deepgoplus(id_sequence_set, output_file="deepgoplus_predictions.tsv", 
                     job_data = response.json()
                     process_deepgo_to_tsv(job_data, output_file=output_file)
                     print(f"Batch {i//batch_size + 1} succeeded on retry attempt {retry_count}")
+                    consective_failures = 0  # Reset on success
                     break  # Success, exit retry loop
                 except requests.exceptions.RequestException as retry_e:
                     print(f"Retry attempt {retry_count} failed: {retry_e}")
