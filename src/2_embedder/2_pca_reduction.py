@@ -53,8 +53,8 @@ def save_embeddings_to_file(embedding_dict, output_filepath):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Apply PCA to reduce dimensionality of embeddings.')
-    parser.add_argument('--input_file', type=str, required=True, help='Path to the input .npz file containing embeddings.')
-    parser.add_argument('--output_file', type=str, required=True, help='Path to save the PCA-reduced embeddings as a .npz file.')
+    parser.add_argument('input_file', type=str, help='Path to the input .npz file containing embeddings.')
+    parser.add_argument('output_file', type=str, help='Path to save the PCA-reduced embeddings as a .npz file.')
     parser.add_argument('--variance_threshold', type=float, default=0.90, help='Variance threshold for determining optimal number of PCA components (default: 0.90).')
     args = parser.parse_args()
 
