@@ -12,6 +12,8 @@ from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import silhouette_score
 from sklearn import metrics
 from scipy.spatial.distance import cdist
+from sklearn.preprocessing import Normalizer
+import hdbscan
 
 def extract_embeddings_from_npz(npz_filepath):
     '''Extracts embeddings from a .npz file and returns them as a dictionary.'''
@@ -19,6 +21,14 @@ def extract_embeddings_from_npz(npz_filepath):
     embedding_dict = {key: data[key] for key in data.files}
     # print(embedding_dict.keys())  # print keys to verify contents
     return embedding_dict
+
+def normalize_embeddings(embedding_dict):
+    '''Normalizes the embeddings in the dictionary using L2 normalization.'''
+    protein_ids = list(embedding_dict.keys())
+    embeddings = np.array(list(embedding_dict.values()))
+    normalizer = Normalizer()
+    normalized_embeddings = normalizer.fit_transform(embeddings)
+    return dict(zip(protein_ids, normalized_embeddings))
 
 def calculate_clusters(embedding_dict, n_clusters = 10):
     '''Calculates clusters from the PCA-reduced embeddings using K-means.'''
@@ -146,6 +156,15 @@ def dbscan_clustering(embedding_dict, eps=0.25, min_samples=5):
     print(max(cluster_labels) + 1, "clusters found (including noise if present).")
     return dict(zip(protein_ids, cluster_labels)), None  # DBSCAN does not have cluster centers
 
+def hdbscan_clustering(embedding_dict, min_cluster_size=5):
+    '''Performs HDBSCAN clustering to automatically determine clusters based on density.'''
+    protein_ids = list(embedding_dict.keys())
+    embeddings = np.array(list(embedding_dict.values()))
+    hdbscan_clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size)
+    cluster_labels = hdbscan_clusterer.fit_predict(embeddings)
+    print(max(cluster_labels) + 1, "clusters found (including noise if present).")
+    return dict(zip(protein_ids, cluster_labels)), None  # HDBSCAN does not have cluster centers
+
 if __name__ == "__main__":
     # input file, cluster range (optional).
     parser = argparse.ArgumentParser(description='Calculate clusters from PCA-reduced embeddings.')
@@ -158,20 +177,23 @@ if __name__ == "__main__":
     print(f"Loading embeddings from {args.input_file}...")
     embedding_dict = extract_embeddings_from_npz(args.input_file)
     print(f"Loaded {len(embedding_dict)} embeddings at {len(embedding_dict[next(iter(embedding_dict))])} dimensions.")
+    print("Normalizing embeddings...")
+    embedding_dict = normalize_embeddings(embedding_dict)
     print("Calculating clusters using DBSCAN...")
-    cluster_count = 1
-    curr_eps = 0.5
-    while (cluster_count > 100):
-        cluster_labels, _ = dbscan_clustering(embedding_dict, eps=curr_eps, min_samples=5)
-        if max(cluster_labels.values()) + 1 > 1:
-            break
-        curr_eps = curr_eps / 2
-        print(f"Only one cluster found, reducing eps to {curr_eps} and retrying...")
-        cluster_count = max(cluster_labels.values()) + 1
-    print(f"Calculated clusters for {cluster_count} clusters (including noise if present).")
-    print("Calculating silhouette score for the clustering...")
+    # for i in range(1, 20):
+    #      print(f"DBSCAN with eps={0.1 * i}...")
+    #      cluster_labels, _ = dbscan_clustering(embedding_dict, eps=0.1 * i)
+    #      cluster_count = max(cluster_labels.values()) + 1  # +1 because cluster labels start at 0, and -1 is noise
+    #      print(f"Calculated clusters for {cluster_count} clusters (including noise if present).")
+    #      if cluster_count > 1:  # silhouette score is only valid if there are at least 2 clusters 
+    #         silhouette_score_value = calculate_silhouette_score(embedding_dict, cluster_labels)
+    #         print(f"Silhouette Score for DBSCAN with eps={0.1 * i}: {silhouette_score_value:.4f}")
+
+    # try HDBSCAN 
+    print("Calculating clusters using HDBSCAN...")
+    cluster_labels, _ = hdbscan_clustering(embedding_dict, min_cluster_size=5)
     silhouette_score_value = calculate_silhouette_score(embedding_dict, cluster_labels)
-    print(f"Silhouette Score for the clustering: {silhouette_score_value:.4f}")
+    print(f"Silhouette Score for HDBSCAN with min_cluster_size=5: {silhouette_score_value:.4f}")
 
     # optimal_cluster_ct_em = determine_optimal_clusters_ss(embedding_dict, args.min_clusters, args.max_clusters, args.increment)
     # print(f"Optimal number of clusters determined by elbow method: {optimal_cluster_ct_em}")
