@@ -101,6 +101,42 @@ def determine_optimal_clusters_em(embedding_dict, min_clusters = 2,max_clusters=
     optimal_clusters = cluster_range[np.argmin(np.diff(distortions))]
     return optimal_clusters
 
+def x_means_clustering(embedding_dict, initial_clusters = 2, max_clusters = 20):
+    '''Performs X-means clustering to automatically determine the optimal number of clusters.'''
+    protein_ids = list(embedding_dict.keys())
+    embeddings = np.array(list(embedding_dict.values()))
+    # Start with initial K-means clustering
+    kmeans = KMeans(n_clusters=initial_clusters, random_state=42)
+    cluster_labels = kmeans.fit_predict(embeddings)
+    current_clusters = initial_clusters
+    print(f"Starting X-means clustering with min {initial_clusters} clusters and max {max_clusters} clusters.")
+    while current_clusters < max_clusters:
+        # For each cluster, try splitting it and evaluate with AIC/BIC
+        new_labels = cluster_labels.copy()
+        for cluster in range(current_clusters):
+            cluster_indices = np.where(cluster_labels == cluster)[0]
+            if len(cluster_indices) <= 1:
+                continue  # skip small clusters
+            kmeans_split = KMeans(n_clusters=2, random_state=42)
+            split_labels = kmeans_split.fit_predict(embeddings[cluster_indices])
+            # Evaluate split with AIC/BIC)
+            original_inertia = kmeans.inertia_
+            split_inertia = kmeans_split.inertia_
+            if split_inertia < original_inertia:  # simple criterion for accepting split
+                new_labels[cluster_indices[split_labels == 0]] = cluster
+                new_labels[cluster_indices[split_labels == 1]] = current_clusters
+                current_clusters += 1
+                print(f"Cluster {cluster} split into 2 clusters. Total clusters: {current_clusters}")
+                if current_clusters >= max_clusters:
+                    break
+        # If no splits were accepted, break the loop
+        if np.array_equal(cluster_labels, new_labels):
+            break
+        cluster_labels = new_labels
+        current_clusters += 1
+    print(f"X-means determined optimal number of clusters: {current_clusters}")
+    return dict(zip(protein_ids, cluster_labels)), kmeans.cluster_centers_
+
 if __name__ == "__main__":
     # input file, cluster range (optional).
     parser = argparse.ArgumentParser(description='Calculate clusters from PCA-reduced embeddings.')
@@ -113,8 +149,14 @@ if __name__ == "__main__":
     print(f"Loading embeddings from {args.input_file}...")
     embedding_dict = extract_embeddings_from_npz(args.input_file)
     print(f"Loaded {len(embedding_dict)} embeddings at {len(embedding_dict[next(iter(embedding_dict))])} dimensions.")
-    optimal_cluster_ct_em = determine_optimal_clusters_ss(embedding_dict, args.min_clusters, args.max_clusters, args.increment)
-    print(f"Optimal number of clusters determined by elbow method: {optimal_cluster_ct_em}")
+    print("Calculating clusters using X-means...")
+    cluster_labels, cluster_centers = x_means_clustering(embedding_dict, initial_clusters=args.min_clusters, max_clusters=args.max_clusters)
+    print("Calculating silhouette score for the clustering...")
+    silhouette_score_value = calculate_silhouette_score(embedding_dict, cluster_labels)
+    print(f"Silhouette Score for the clustering: {silhouette_score_value:.4f}")
+
+    # optimal_cluster_ct_em = determine_optimal_clusters_ss(embedding_dict, args.min_clusters, args.max_clusters, args.increment)
+    # print(f"Optimal number of clusters determined by elbow method: {optimal_cluster_ct_em}")
 
     # save_cluster_assignments(cluster_labels, 'cluster_assignments.csv')
     # print("Cluster assignments saved to cluster_assignments.csv")
