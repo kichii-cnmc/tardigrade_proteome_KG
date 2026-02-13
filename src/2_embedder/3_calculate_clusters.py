@@ -8,7 +8,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import silhouette_score
 from sklearn import metrics
 from scipy.spatial.distance import cdist
@@ -137,6 +137,15 @@ def x_means_clustering(embedding_dict, initial_clusters = 2, max_clusters = 20):
     print(f"X-means determined optimal number of clusters: {current_clusters}")
     return dict(zip(protein_ids, cluster_labels)), kmeans.cluster_centers_
 
+def dbscan_clustering(embedding_dict, eps=0.25, min_samples=5):
+    '''Performs DBSCAN clustering to automatically determine clusters based on density.'''
+    protein_ids = list(embedding_dict.keys())
+    embeddings = np.array(list(embedding_dict.values()))
+    dbscan = DBSCAN(eps=eps, min_samples=min_samples)
+    cluster_labels = dbscan.fit_predict(embeddings)
+    print(max(cluster_labels) + 1, "clusters found (including noise if present).")
+    return dict(zip(protein_ids, cluster_labels)), None  # DBSCAN does not have cluster centers
+
 if __name__ == "__main__":
     # input file, cluster range (optional).
     parser = argparse.ArgumentParser(description='Calculate clusters from PCA-reduced embeddings.')
@@ -149,8 +158,17 @@ if __name__ == "__main__":
     print(f"Loading embeddings from {args.input_file}...")
     embedding_dict = extract_embeddings_from_npz(args.input_file)
     print(f"Loaded {len(embedding_dict)} embeddings at {len(embedding_dict[next(iter(embedding_dict))])} dimensions.")
-    print("Calculating clusters using X-means...")
-    cluster_labels, cluster_centers = x_means_clustering(embedding_dict, initial_clusters=args.min_clusters, max_clusters=args.max_clusters)
+    print("Calculating clusters using DBSCAN...")
+    cluster_count = 1
+    curr_eps = 0.5
+    while (cluster_count > 100):
+        cluster_labels, _ = dbscan_clustering(embedding_dict, eps=curr_eps, min_samples=5)
+        if max(cluster_labels.values()) + 1 > 1:
+            break
+        curr_eps = curr_eps / 2
+        print(f"Only one cluster found, reducing eps to {curr_eps} and retrying...")
+        cluster_count = max(cluster_labels.values()) + 1
+    print(f"Calculated clusters for {cluster_count} clusters (including noise if present).")
     print("Calculating silhouette score for the clustering...")
     silhouette_score_value = calculate_silhouette_score(embedding_dict, cluster_labels)
     print(f"Silhouette Score for the clustering: {silhouette_score_value:.4f}")
