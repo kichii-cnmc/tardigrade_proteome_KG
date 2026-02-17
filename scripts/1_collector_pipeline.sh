@@ -63,20 +63,20 @@ fi
 if [ "$TEST_MODE" = true ]; then
     echo "Test mode enabled: Pulling protein info for test files."
     if [[ -f "data/2_merged/test_RV.tsv" ]]; then
-    python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/test_RV.tsv data/3_organized/test_RV.tsv --method batch
+    python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/test_RV.tsv data/3_organized/test_UniProt_RV.tsv
     fi
     if [[ -f "data/2_merged/test_HE.tsv" ]]; then
-        python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/test_HE.tsv data/3_organized/test_HE.tsv --method batch
+        python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/test_HE.tsv data/3_organized/test_UniProt_HE.tsv
     fi
 fi
 
 # run the protein info pull script on each full file if not in test mode
 if [ "$TEST_MODE" = false ]; then
     if [[ -f "data/2_merged/merged_RV.tsv" ]]; then
-        python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_RV.tsv data/3_organized/info_RV.tsv --method batch
+        python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_RV.tsv data/3_organized/UniProt_RV.tsv
     fi  
     if [[ -f "data/2_merged/merged_HE.tsv" ]]; then
-        python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_HE.tsv data/3_organized/info_HE.tsv --method batch
+        python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_HE.tsv data/3_organized/UniProt_HE.tsv
     fi
 fi
 
@@ -85,10 +85,10 @@ bash src/1_collector/4_download_string_ppi.sh
 
 # process STRING PPI data
 if [[ -f "data/1_raw/string_ppi/rv_ppi.txt" ]]; then
-    python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/rv_ppi.txt data/3_organized/processed_rv_ppi.tsv
+    python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/rv_ppi.txt data/3_organized/STRING_RV_PPI.tsv
 fi
 if [[ -f "data/1_raw/string_ppi/he_ppi.txt" ]]; then
-    python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/he_ppi.txt data/3_organized/processed_he_ppi.tsv
+    python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/he_ppi.txt data/3_organized/STRING_HE_PPI.tsv
 fi
 
 echo "Protein information retrieval completed."
