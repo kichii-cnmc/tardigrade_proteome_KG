@@ -58,7 +58,7 @@ if __name__ == "__main__":
     parser.add_argument('--variance_threshold', type=float, default=0.90, help='Variance threshold for determining optimal number of PCA components (default: 0.90).')
     args = parser.parse_args()
 
-    print(f"Loading embeddings from {args.input_file}...")
+    print(f"\nLoading embeddings from {args.input_file}...")
     embedding_dict = extract_embeddings_from_npz(args.input_file)
     print(f"Loaded {len(embedding_dict)} embeddings at {len(embedding_dict[next(iter(embedding_dict))])} dimensions.")
 

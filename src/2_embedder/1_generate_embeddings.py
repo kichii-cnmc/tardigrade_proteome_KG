@@ -114,7 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_mode", action='store_true', help="If set, processes only a small subset of data for testing.")
     args = parser.parse_args()
 
-    print("Loading protein sequences from TSV files...")
+    print("\nLoading protein sequences from TSV files...")
     df_list = generate_df_list_of_sequences(args.input_folder)
     print(f"Found {len(df_list)} sequence TSV files.")
 
