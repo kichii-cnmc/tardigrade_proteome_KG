@@ -48,11 +48,13 @@ def save_similarity_matrix_to_csv(protein_ids, similarity_matrix, output_filepat
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Calculate cosine similarity matrix from embeddings.')
     parser.add_argument('input_file', type=str, help='Path to the input .npz file containing embeddings.')
-    parser.add_argument('output_file', type=str, help='Path to save the cosine similarity matrix as a .csv file.')
+    parser.add_argument('output_dir', type=str, help='Path to save the cosine similarity matrix as a .csv file and edge list format.')
     parser.add_argument('--normalize', action='store_true', help='Whether to normalize embeddings before calculating similarity (default: False).')
     parser.add_argument('--test_mode', action='store_true', help='If set, processes only a small subset of data for testing.')
 
     args = parser.parse_args()
+    output_csv_path = f"{args.output_dir}/embedding_similarity_matrix.csv"
+    output_list_path = f"{args.output_dir}/embedding_similarity_edge_list.csv"
 
     print(f"Loading embeddings from {args.input_file}...")
     embedding_dict = extract_embeddings_from_npz(args.input_file)
@@ -81,9 +83,9 @@ if __name__ == "__main__":
     plt.ylabel('Frequency')
     plt.show()
 
-    print(f"Saving cosine similarity matrix to {args.output_file}...")
+    print(f"Saving cosine similarity matrix to {output_csv_path}...")
     # Use numpy directly for faster I/O, especially for large matrices
-    np.savetxt(args.output_file, similarity_matrix.astype(np.float32), delimiter=',', 
+    np.savetxt(output_csv_path, similarity_matrix.astype(np.float32), delimiter=',', 
                header=','.join(protein_ids), comments='', fmt='%.4f')
     
     print("Cosine similarity calculation completed.")
@@ -102,6 +104,6 @@ if __name__ == "__main__":
         'embedding_similarity': similarity_matrix[indices]
     })
     
-    edge_list_df.to_csv(args.output_file.replace('.csv', '_edge_list.csv'), index=False, float_format='%.4f')
+    edge_list_df.to_csv(output_list_path, index=False, float_format='%.4f')
     time_end = time()
     print(f"Saved edge list format in {time_end - time_start:.2f} seconds.")
