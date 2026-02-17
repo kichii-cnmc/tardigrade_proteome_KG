@@ -21,28 +21,28 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# # clear embedding generation log file
-# LOG_FILE="logs/embedding_generation.log"
-# if [ -f "$LOG_FILE" ]; then
-#     rm "$LOG_FILE"
-#     echo "Cleared existing embedding generation log file."
-# fi
+# clear embedding generation log file
+LOG_FILE="logs/embedding_generation.log"
+if [ -f "$LOG_FILE" ]; then
+    rm "$LOG_FILE"
+    echo "Cleared existing embedding generation log file."
+fi
 
-# # run the embedding generation script
-# python3 src/2_embedder/1_generate_embeddings.py data/3_organized data/1_raw/embeddings/raw_embeddings.npz $(if [ "$TEST_MODE" = true ]; then echo "--test_mode"; fi)
-# echo "Embedding generation completed."
+# run the embedding generation script
+python3 src/2_embedder/1_generate_embeddings.py data/3_organized data/1_raw/embeddings/raw_embeddings.npz $(if [ "$TEST_MODE" = true ]; then echo "--test_mode"; fi)
+echo "Embedding generation completed."
 
-# # log generation time / size / test mode info
-# echo "Embedding generation log:" > logs/embedding_generation.log
-# echo "Date: $(date)" >> logs/embedding_generation.log
-# echo "Test mode: $TEST_MODE" >> logs/embedding_generation.log
-# if [ -f "data/1_raw/embeddings/raw_embeddings.npz" ]; then
-#     EMBEDDING_SIZE=$(du -h data/1_raw/embeddings/raw_embeddings.npz | cut -f1)
-#     echo "Embedding file size: $EMBEDDING_SIZE" >> logs/embedding_generation.log
-#     echo "Embedding generation completed successfully." >> logs/embedding_generation.log
-# else
-#     echo "Embedding file not found. Embedding generation may have failed." >> logs/embedding_generation.log
-# fi 
+# log generation time / size / test mode info
+echo "Embedding generation log:" > logs/embedding_generation.log
+echo "Date: $(date)" >> logs/embedding_generation.log
+echo "Test mode: $TEST_MODE" >> logs/embedding_generation.log
+if [ -f "data/1_raw/embeddings/raw_embeddings.npz" ]; then
+    EMBEDDING_SIZE=$(du -h data/1_raw/embeddings/raw_embeddings.npz | cut -f1)
+    echo "Embedding file size: $EMBEDDING_SIZE" >> logs/embedding_generation.log
+    echo "Embedding generation completed successfully." >> logs/embedding_generation.log
+else
+    echo "Embedding file not found. Embedding generation may have failed." >> logs/embedding_generation.log
+fi 
 
 # apply pca dimensionality reduction to the embeddings
 python3 src/2_embedder/2_pca_reduction.py data/1_raw/embeddings/raw_embeddings.npz data/1_raw/embeddings/reduced_embeddings.npz --variance_threshold 0.90
