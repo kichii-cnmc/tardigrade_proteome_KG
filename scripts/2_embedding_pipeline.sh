@@ -21,16 +21,16 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# run the embedding generation script
-python3 src/2_embedder/1_generate_embeddings.py data/3_organized data/1_raw/embeddings/raw_embeddings.npz $(if [ "$TEST_MODE" = true ]; then echo "--test_mode"; fi)
-echo "Embedding generation completed."
-
 # clear embedding generation log file
 LOG_FILE="logs/embedding_generation.log"
 if [ -f "$LOG_FILE" ]; then
     rm "$LOG_FILE"
     echo "Cleared existing embedding generation log file."
 fi
+
+# run the embedding generation script
+python3 src/2_embedder/1_generate_embeddings.py data/3_organized data/1_raw/embeddings/raw_embeddings.npz $(if [ "$TEST_MODE" = true ]; then echo "--test_mode"; fi)
+echo "Embedding generation completed."
 
 # log generation time / size / test mode info
 echo "Embedding generation log:" > logs/embedding_generation.log
@@ -50,3 +50,5 @@ python3 src/2_embedder/2_pca_reduction.py data/1_raw/embeddings/raw_embeddings.n
 # run the embedding comparison script to calculate cosine similarity matrix & save edge list for graph building
 python3 src/2_embedder/3_compare_embeddings.py data/1_raw/embeddings/reduced_embeddings.npz data/3_organized $(if [ "$TEST_MODE" = true ]; then echo "--test_mode"; fi)
 echo "Embedding comparison completed."
+
+# end of script
