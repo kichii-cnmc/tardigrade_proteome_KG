@@ -132,6 +132,8 @@ if __name__ == "__main__":
     print(f"Generated embeddings for {len(embedding_dict)} proteins in {end_time - start_time:.2f} seconds.")
 
     print(f"Saving embeddings to {args.output_file}...")
+    # if no directory present, create it
+    os.makedirs(os.path.dirname(args.output_file), exist_ok=True)
     save_embeddings_to_file(embedding_dict, args.output_file)
 
     print("Embedding generation completed.")
