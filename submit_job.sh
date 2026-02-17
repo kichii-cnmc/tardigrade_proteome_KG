@@ -17,5 +17,5 @@ module load cuda # Load CUDA module if required for GPU support
 eval "$(micromamba shell hook --shell bash)"
 micromamba activate tardigrade_proteome_KG_env
 
-# Run the collector pipeline script
-python3 src/2_embedder/1_generate_embeddings.py data/3_organized/ embeddings_test_hpc.npz --test_mode
+# run the embedding pipeline script
+bash scripts/2_embedding_pipeline.sh 
