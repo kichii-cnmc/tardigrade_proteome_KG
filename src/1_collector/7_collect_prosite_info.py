@@ -73,6 +73,9 @@ if __name__ == "__main__":
     for protein_id in protein_ids:
         print(f"Querying PROSITE for {protein_id}...")
         response_text = query_prosite_for_protein(protein_id)
+        if response_text is None:
+            print(f"Skipping {protein_id} due to query error.")
+            continue
         print(response_text)
         domain_info_list = process_prosite_response_json(protein_id, response_text)
         if domain_info_list:
