@@ -14,7 +14,7 @@ def parse_input_tsv(input_filepath):
 
 def query_prosite_for_protein(protein_id):
     '''Queries the PROSITE database for domain information for a given protein ID.'''
-    url = f"https://prosite.expasy.org/cgi-bin/prosite/scanprosite/PSScan.cgi?seq={protein_id}&output=json"
+    url = f"https://prosite.expasy.org/cgi-bin/prosite/scanprosite/PSScan.cgi?seq={protein_id}&output=json&lowscore=1"
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()  # raise an error for bad status codes
@@ -66,21 +66,24 @@ if __name__ == "__main__":
     print(f"Found {len(protein_ids)} protein IDs. Second column name: {second_column_name}")
 
     if args.test_mode:
-        protein_ids = protein_ids[:5]  # process only the first 50 protein IDs for testing
+        protein_ids = protein_ids[:50]  # process only the first 50 protein IDs for testing
         print("Test mode enabled. Processing only the first 50 protein IDs.")
 
     # create output file and write header
     with open(args.output_file, 'w') as f:
         f.write('ProteinID\tPROSITE_AC\tDescription\tScore\tLevel\tLevelTag\n')
 
+    start_time = time.time()
     for protein_id in protein_ids:
         print(f"Querying PROSITE for {protein_id}...")
         response_text = query_prosite_for_protein(protein_id)
         if response_text is None:
             print(f"Skipping {protein_id} due to query error.")
             continue
-        print(response_text)
+        # print(response_text)
         domain_info_list = process_prosite_response_json(protein_id, response_text)
         if domain_info_list:
             save_domain_info_to_tsv(domain_info_list, args.output_file)
         time.sleep(0.1)  # add a small delay to avoid overwhelming the server
+    end_time = time.time()
+    print(f"PROSITE domain information collection completed in {end_time - start_time:.2f} seconds for {len(protein_ids)} proteins. Results saved to {args.output_file}.")
