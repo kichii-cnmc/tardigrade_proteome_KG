@@ -29,11 +29,14 @@ def process_prosite_response_json(protein_id, response_text):
         data = json.loads(response_text)
         domain_info_list = []
         for match in data.get('matchset', []):
+            # collect score and level OR level_tag if score is not available
             domain_info = {
                 'ProteinID': protein_id,
                 'PROSITE_AC': match.get('signature_ac', ''),
                 'Description': match.get('signature_id', ''),
                 'Score': match.get('score', ''),
+                'Level': match.get('level', ''),
+                'LevelTag': match.get('level_tag', '')
             }
             domain_info_list.append(domain_info)
         return domain_info_list
@@ -68,7 +71,7 @@ if __name__ == "__main__":
 
     # create output file and write header
     with open(args.output_file, 'w') as f:
-        f.write('ProteinID\tPROSITE_AC\tDescription\tScore\n')
+        f.write('ProteinID\tPROSITE_AC\tDescription\tScore\tLevel\tLevelTag\n')
 
     for protein_id in protein_ids:
         print(f"Querying PROSITE for {protein_id}...")
