@@ -62,7 +62,7 @@ if __name__ == "__main__":
     
     if args.test_mode:
         # Process only a small subset of data for testing
-        test_size = min(1000, len(embedding_dict))
+        test_size = min(100, len(embedding_dict))
         embedding_dict = {k: embedding_dict[k] for k in list(embedding_dict.keys())[:test_size]}
         print(f"Test mode enabled: processing only {test_size} embeddings.")
 

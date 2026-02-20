@@ -122,8 +122,8 @@ if __name__ == "__main__":
     model, batch_converter, device = initialize_esm_model()
 
     if args.test_mode:
-        print("Test mode enabled: limiting to first 50 sequences per file. Total 100 sequences.")
-        df_list = [df.head(50) for df in df_list]
+        print("Test mode enabled: limiting to first 100 sequences per file. Total 100 sequences.")
+        df_list = [df.head(100) for df in df_list]
     
     start_time = time.time()
     print("Generating embeddings for protein sequences...")
