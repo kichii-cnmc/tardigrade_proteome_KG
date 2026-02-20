@@ -48,7 +48,7 @@ fi
 python3 src/2_embedder/2_pca_reduction.py data/1_raw/embeddings/raw_embeddings.npz data/1_raw/embeddings/reduced_embeddings.npz --variance_threshold 0.90
 
 # run the embedding comparison script to calculate cosine similarity matrix & save edge list for graph building
-python3 src/2_embedder/3_compare_embeddings.py data/1_raw/embeddings/reduced_embeddings.npz data/3_organized $(if [ "$TEST_MODE" = true ]; then echo "--test_mode"; fi)
+python3 src/2_embedder/3_compare_embeddings.py data/1_raw/embeddings/reduced_embeddings.npz data/3_organized/ $(if [ "$TEST_MODE" = true ]; then echo "--test_mode"; fi)
 echo "Embedding comparison completed."
 
 # end of script
