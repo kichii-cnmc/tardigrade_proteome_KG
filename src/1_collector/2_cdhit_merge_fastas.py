@@ -179,6 +179,8 @@ def cluster_sequences(input_fasta, output_tsv, identity_threshold=1.0):
                         other_ids.append(accession)
                 else:
                     other_ids.append(accession)
+            if uniprot_id == "": # if no uniprot id, remove from list
+                continue
             out_f.write(f"{uniprot_id}\t{uniprot_length}\t{ncbi_id}\t{ncbi_length}\t{';'.join(other_ids)}\n")
     
     return accession_list
