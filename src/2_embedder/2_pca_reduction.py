@@ -35,7 +35,7 @@ def find_optimal_number_of_components(embedding_dict, variance_threshold = 0.90)
     plt.xlabel('Number of Components')
     plt.ylabel('Cumulative Explained Variance')
     plt.grid()
-    plt.savefig('pca_scree_plot.png')
+    plt.savefig('logs/pca_scree_plot.png')
     optimal_components = np.argmax(np.cumsum(pca.explained_variance_ratio_) >= variance_threshold) + 1  # +1 because index starts at 0
     print(f"Optimal number of PCA components to retain {variance_threshold*100}% variance: {optimal_components}")
     return optimal_components
