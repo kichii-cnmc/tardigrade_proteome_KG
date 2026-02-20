@@ -91,7 +91,7 @@ python3 src/1_collector/6_collect_deepgo.py data/3_organized/ --output_file data
 echo "DeepGO annotation collection completed."
 
 # process DeepGO annotations to create edge list for graph building
-python3 src/1_collector/7_process_deepgo_annotations.py data/1_raw/deepgo_annotations/deepgo_annotations.tsv data/3_organized/DeepGO.tsv
+python3 src/1_collector/7_process_deepgo.py data/1_raw/deepgo_annotations/deepgo_annotations.tsv data/3_organized/DeepGO.tsv
 echo "DeepGO annotation processing completed."
 
 
