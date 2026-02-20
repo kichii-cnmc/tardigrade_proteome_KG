@@ -21,12 +21,14 @@ def process_deepgo_annotations(input_file, output_file):
         # remove the function type column
         subset = subset.drop(columns=['Function Type'])
 
-        # change column names to UniProt_ID, DeepGO_Term, Score
-        subset = subset.rename(columns={'SwissProt ID': 'UniProt_ID', 'GO Term': 'DeepGO_Term'}) 
+        function_shorthand_dict = {'Cellular Component': 'CC', 'Molecular Function': 'MF', 'Biological Process': 'BP'}
+        shorthand = function_shorthand_dict.get(function_type, function_type)
 
-    # save as separate tsvs with columns: ProteinID, GO_Term, Score
-        function_shorthand = {'Cellular Component': 'CC', 'Molecular Function': 'MF', 'Biological Process': 'BP'}
-        output_name = output_file.replace(".tsv", f"_{function_shorthand.get(function_type, function_type)}.tsv")
+        # change column names to UniProt_ID, DeepGO_Term, Score
+        subset = subset.rename(columns={'SwissProt ID': 'UniProt_ID', 'GO Term': f"DeepGO_{shorthand}", 'Score': 'Score'}) 
+
+        # save as separate tsvs with columns: ProteinID, GO_Term, Score
+        output_name = output_file.replace(".tsv", f"_{shorthand}.tsv")
         subset.to_csv(output_name, sep='\t', index=False)
 
 if __name__ == "__main__":
