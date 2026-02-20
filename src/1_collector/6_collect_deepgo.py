@@ -220,9 +220,9 @@ if __name__ == "__main__":
         test_sequences = all_id_sequence_list[:100] or []  # Take first 100 or all if less than 100
         all_id_sequence_set = set(test_sequences)
         print(f"Test mode: Using first 100 sequences (sorted by protein ID)")
-        print(f"First sequence ID: {test_sequences[0][0]}")  # Show which protein is first
 
     start_time = time.time()
     query_deepgoplus(all_id_sequence_set, output_file=args.output_file, version_number=args.version_number)
     end_time = time.time()
     print(f"GO term prediction of {len(all_id_sequence_set)} sequences completed in {end_time - start_time:.2f} seconds. Results saved to {args.output_file}.")
+

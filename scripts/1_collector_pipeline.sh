@@ -85,9 +85,15 @@ python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/rv_ppi.t
 python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/he_ppi.txt data/3_organized/HE_STRING_ppi.tsv
 echo "Protein information retrieval completed."
 
-# collect DeepGo annotations
+# collect DeepGO annotations
 mkdir -p data/1_raw/deepgo_annotations
-python3 src/1_collector/6_collect_deepgo.py data/3_organized/ data/1_raw/deepgo_annotations/ $(if [ "$TEST_MODE" = true ]; then echo "--test_mode"; fi)
+python3 src/1_collector/6_collect_deepgo.py data/3_organized/ --output_file data/1_raw/deepgo_annotations/deepgo_annotations.tsv $(if [ "$TEST_MODE" = true ]; then echo "--test_mode"; fi)
 echo "DeepGO annotation collection completed."
 
+# process DeepGO annotations to create edge list for graph building
+
+
+
+
 # end of script
+echo "Collector pipeline completed."
