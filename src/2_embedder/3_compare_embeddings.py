@@ -104,6 +104,10 @@ if __name__ == "__main__":
         'embedding_similarity': similarity_matrix[indices]
     })
     
+    # Fast sort by similarity in descending order using numpy argsort
+    sort_indices = np.argsort(-similarity_matrix[indices])
+    edge_list_df = edge_list_df.iloc[sort_indices]
+    
     edge_list_df.to_csv(output_list_path, sep='\t', index=False, float_format='%.4f')
     time_end = time()
     print(f"Saved edge list format in {time_end - time_start:.2f} seconds.")
