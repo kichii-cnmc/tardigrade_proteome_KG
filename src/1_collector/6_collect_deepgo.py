@@ -217,7 +217,7 @@ if __name__ == "__main__":
     if args.test_mode:
         # Sort by protein ID for consistent, deterministic selection
         all_id_sequence_list = sorted(list(all_id_sequence_set), key=lambda x: x[0])  # Sort by protein_id (first element)
-        test_sequences = all_id_sequence_list[:100]
+        test_sequences = all_id_sequence_list[:100] or []  # Take first 100 or all if less than 100
         all_id_sequence_set = set(test_sequences)
         print(f"Test mode: Using first 100 sequences (sorted by protein ID)")
         print(f"First sequence ID: {test_sequences[0][0]}")  # Show which protein is first
