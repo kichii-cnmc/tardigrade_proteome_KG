@@ -36,4 +36,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     process_deepgo_annotations(args.input_file, args.output_file)
- 
+    print(f"Processed DeepGO annotations saved to {args.output_file.replace('.tsv', '')}_<FunctionType>.tsv for each function type.")
