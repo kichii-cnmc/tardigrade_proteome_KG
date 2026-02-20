@@ -206,7 +206,8 @@ if __name__ == "__main__":
         ('Pfam_domains', 'has_pfam_domain', 1),
         ('KEGG_pathways', 'in_kegg_pathway', 1),
         ('PROSITE_annotations', 'has_prosite_annotation', 1),
-        ('PPI_target', 'interacts_with', None)
+        ('PPI_target', 'interacts_with', None),
+        ('embedding_similarity', 'embeddings_similar_to', None)
     ]
     list_of_node_attr = [
         ('UniProt_ID', 'Protein'),
