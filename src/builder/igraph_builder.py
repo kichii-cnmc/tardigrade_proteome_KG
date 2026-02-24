@@ -25,7 +25,8 @@ class IGraphBuilder:
         'DeepGO_BP': 'Biological_Process',
         'Pfam_domains': 'Pfam_Domain',
         'KEGG_pathways': 'KEGG_Pathway',
-        'PROSITE_annotations': 'PROSITE_Annotation'
+        'PROSITE_annotations': 'PROSITE_Annotation',
+        'UniProt_ID': 'Protein'
     }
     GRAPH_NODE_ALIAS_TYPES = ['NCBI_ID', 'Organism', 'Gene_Name', 'AF'] # columns that can be added as node attributes
 
@@ -113,17 +114,15 @@ class IGraphBuilder:
                 edges_list.append((source, target, weight))
             print(f"Adding edges of type '{edge_label}' from {tsv_file_path}...")
             # add nodes first to ensure all vertices exist before adding edges, then add edges in bulk
-            if second_col in self.GRAPH_NODE_ALIAS_TYPES:
-                all_nodes = [node for source, target, _ in edges_list for node in (source, target)]
-                self.add_nodes_from_list(all_nodes, node_type=self.GRAPH_NODE_LABELS.get(second_col))
-            else:
-                all_nodes = [node for source, target, _ in edges_list for node in (source, target)]
-                self.add_nodes_from_list(all_nodes, node_type="MissingType")
+            node_type = self.GRAPH_NODE_LABELS.get(second_col, "UnknownType")
+            if node_type == "UnknownType":
+                print(f"    Warning: No node type mapping found for column '{second_col}', defaulting to 'UnknownType'.")
+            self.add_nodes_from_list([target for _, target, _ in edges_list], node_type=node_type)
             self.add_edges_from_list(edges_list, edge_type=edge_label)
         elif second_col in self.GRAPH_NODE_LABELS:
             node_type = self.GRAPH_NODE_LABELS[second_col]
             print(f"Adding nodes of type '{node_type}' from {tsv_file_path}...")
-            self.add_nodes_from_list(df.iloc[:, 0].tolist(), node_type=node_type)
+            self.add_nodes_from_list(df.iloc[:, 1].tolist(), node_type=node_type)
         else:
             print(f"Unrecognized format in {tsv_file_path}, skipping.")
 
