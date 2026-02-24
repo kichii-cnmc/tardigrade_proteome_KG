@@ -283,6 +283,13 @@ class IGraphBuilder:
                 target = self.graph.vs[edge.target]["name"]
                 f.write(f"{source}\t{edge['edge_type']}\t{target}\n")
 
+    def output_nodes(self, output_path):
+        with open(output_path, 'w') as f:
+            for vertex in self.graph.vs:
+                name = vertex["name"]
+                node_type = vertex["node_type"]
+                f.write(f"{name}\t{node_type}\n")
+
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="Build a graph from TSV files using igraph.")
     argparser.add_argument("tsv_folder", type=str, help="Path to the folder containing TSV files.")
@@ -297,6 +304,6 @@ if __name__ == "__main__":
         print(f"Processing file: {file}")
         graph_builder.add_to_graph_tsv(file)
     graph_builder.evaluate_graph()
-    graph_builder.visualize_graph("graph_visualization.png")
+    graph_builder.visualize_graph("graph_visualization.png", sample_k = 3)
     graph_builder.output_triples("graph_triples.tsv")
-
+    graph_builder.output_nodes("graph_nodes.tsv")
