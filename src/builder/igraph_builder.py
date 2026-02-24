@@ -5,6 +5,10 @@ import json
 import pandas as pd
 import glob
 import argparse
+import matplotlib
+matplotlib.use('Agg')  # non-interactive backend — must be set before pyplot import
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 class IGraphBuilder:
     DIRECTED_GRAPH = True
@@ -225,12 +229,7 @@ class IGraphBuilder:
             sub.add_edges(new_edges, attributes={'edge_type': etypes, 'weight': weights})
         return sub
 
-    def visualize_graph(self, output_path, sample_k=15):
-        import matplotlib
-        matplotlib.use('Agg')  # non-interactive backend — must be set before pyplot import
-        import matplotlib.pyplot as plt
-        import matplotlib.patches as mpatches
-
+    def visualize_graph(self, output_path, sample_k=8):
         NODE_TYPE_COLORS = {
             'Protein':               '#4C72B0',
             'Molecular_Function':    '#DD8452',
@@ -269,6 +268,46 @@ class IGraphBuilder:
 
         present_types = {v['node_type'] for v in g.vs}
         patches = [mpatches.Patch(color=NODE_TYPE_COLORS.get(t, '#CCCCCC'), label=t or 'Unknown')
+                   for t in present_types]
+        fig, ax = plt.subplots(figsize=(3, len(patches) * 0.4 + 0.5))
+        ax.legend(handles=patches, loc='center', frameon=False)
+        ax.axis('off')
+        legend_path = output_path.rsplit('.', 1)[0] + '_legend.png'
+        fig.savefig(legend_path, bbox_inches='tight', dpi=150)
+        plt.close(fig)
+
+    def visualize_graph_edges(self, output_path, edge_threshold=0.3, sample_k=4):
+        '''Visualize a representative subgraph with edges colored by type and weighted by score.'''
+        EDGE_TYPE_COLORS = {
+            'has_molecular_function': '#DD8452',
+            'located_in_cellular_component': '#55A868',
+            'involved_in_biological_process': '#C44E52',
+            'has_pfam_domain': '#8172B2',
+            'in_kegg_pathway': '#937860',
+            'has_prosite_annotation': '#DA8BC3',
+            'interacts_with': '#7B4173',
+            'embeddings_similar_to': '#8C564B',
+            None: '#CCCCCC',
+        }
+        g = self._sample_representative_subgraph(k=sample_k)
+        edge_colors = [EDGE_TYPE_COLORS.get(e['edge_type'], '#CCCCCC') for e in g.es]
+        edge_widths = [0.5 + 2.5 * (e['weight'] if e['weight'] is not None else 1) for e in g.es]
+        layout = g.layout("fr")
+        ig.plot(
+            g,
+            output_path,
+            layout=layout,
+            bbox=(2400, 2400),
+            margin=80,
+            vertex_color='#CCCCCC',
+            vertex_size=20,
+            vertex_label=None,
+            edge_color=edge_colors,
+            edge_width=edge_widths,
+            edge_arrow_size=0.4,
+        )
+        present_types = {e['edge_type'] for e in g.es}
+        patches = [mpatches.Patch(color=EDGE_TYPE_COLORS.get(t, '#CCCCCC'), label=t or 'Unknown')
                    for t in present_types]
         fig, ax = plt.subplots(figsize=(3, len(patches) * 0.4 + 0.5))
         ax.legend(handles=patches, loc='center', frameon=False)
