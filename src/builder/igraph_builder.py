@@ -321,6 +321,6 @@ if __name__ == "__main__":
         print(f"Processing file: {file}")
         graph_builder.add_to_graph_tsv(file)
     graph_builder.evaluate_graph()
-    graph_builder.visualize_graph("graph_visualization.png", sample_k = 3)
+    graph_builder.visualize_graph("graph_visualization.png", sample_k = 4)
     graph_builder.output_triples("graph_triples.tsv")
     graph_builder.output_nodes("graph_nodes.tsv")
