@@ -338,4 +338,6 @@ if __name__ == "__main__":
         graph_builder.add_to_graph_tsv(file)
     graph_builder.evaluate_graph()
     graph_builder.visualize_graph("graph_visualization.png")
+    graph_builder.visualize_graph_edges("graph_edges_visualization.png")
     graph_builder.output_triples("graph_triples.tsv")
+
