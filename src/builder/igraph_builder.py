@@ -257,7 +257,7 @@ class IGraphBuilder:
         vertex_colors = [NODE_TYPE_COLORS.get(v['node_type'], '#CCCCCC') for v in g.vs]
         degrees = g.degree()
         max_deg = max(degrees) if degrees else 1
-        vertex_sizes = [10 + 30 * (d / max_deg) for d in degrees]
+        vertex_sizes = [20 + 60 * (d / max_deg) for d in degrees]
         labels = [str(v['name'])[:12] for v in g.vs]
         # edge_labels = [f"{e['edge_type']} ({e['weight']:.2f})" for e in g.es]
         edge_labels = [f"{e['weight']:.2f}" for e in g.es]
@@ -273,13 +273,13 @@ class IGraphBuilder:
             vertex_color=vertex_colors,
             vertex_size=vertex_sizes,
             vertex_label=[f"{label}\n({connectivity})" for label, connectivity in zip(labels, node_connectivity)],
-            vertex_label_size=10,
+            vertex_label_size=20,
             vertex_label_color='#111111',
-            edge_width=0.8,
-            edge_arrow_size=0.6,
+            edge_width=1.6,
+            edge_arrow_size=1.2,
             edge_color=[EDGE_TYPE_COLORS.get(e['edge_type'], '#CCCCCC') for e in g.es],
                 edge_label=edge_labels,
-                edge_label_size=8,
+                edge_label_size=16,
                 edge_label_color='#333333'
         )
 
