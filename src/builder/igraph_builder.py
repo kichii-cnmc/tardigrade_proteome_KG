@@ -49,19 +49,24 @@ class IGraphBuilder:
             name_to_id[vertex['name']] = vertex.index
     
     def add_nodes_from_list(self, nodes_list, node_type=None):
-        '''Add nodes from a list of node names, after checking if they already exist in the graph.'''
+        '''Add nodes from a list of node names. New nodes are inserted with node_type;
+        existing nodes have their node_type updated if node_type is provided.'''
         existing_names = set(self.graph.vs['name']) if self.graph.vcount() > 0 else set()
         seen = set()
-        new_nodes = []
+        new_nodes, update_nodes = [], []
         for node in nodes_list:
-            if node not in existing_names and node not in seen:
-                new_nodes.append(node)
+            if node not in seen:
                 seen.add(node)
+                (update_nodes if node in existing_names else new_nodes).append(node)
         if new_nodes:
             self.graph.add_vertices(
                 len(new_nodes),
                 attributes={'name': new_nodes, 'node_type': [node_type] * len(new_nodes)}
             )
+        if node_type is not None and update_nodes:
+            update_set = set(update_nodes)
+            vs = self.graph.vs.select(lambda v: v['name'] in update_set)
+            vs['node_type'] = [node_type] * len(vs)
 
     def add_edges_from_list(self, edges_list, edge_type=None):
         '''Add edges from a list of (source, target, weight) tuples.'''
