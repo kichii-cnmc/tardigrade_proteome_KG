@@ -115,7 +115,10 @@ class IGraphBuilder:
             # add nodes first to ensure all vertices exist before adding edges, then add edges in bulk
             if second_col in self.GRAPH_NODE_ALIAS_TYPES:
                 all_nodes = [node for source, target, _ in edges_list for node in (source, target)]
-                self.add_nodes_from_list(all_nodes)
+                self.add_nodes_from_list(all_nodes, node_type=self.GRAPH_NODE_LABELS.get(second_col))
+            else:
+                all_nodes = [node for source, target, _ in edges_list for node in (source, target)]
+                self.add_nodes_from_list(all_nodes, node_type="MissingType")
             self.add_edges_from_list(edges_list, edge_type=edge_label)
         elif second_col in self.GRAPH_NODE_LABELS:
             node_type = self.GRAPH_NODE_LABELS[second_col]
@@ -146,6 +149,9 @@ class IGraphBuilder:
             source = self.graph.vs[edge.source]["name"]
             target = self.graph.vs[edge.target]["name"]
             print(f"({source}, {edge['edge_type']}, {target})")
+        print("Example Nodes:")
+        for v in self.graph.vs[:5]:
+            print(f"({v['name']}, {v['node_type']})")
 
     def get_graph(self):
         return self.graph
