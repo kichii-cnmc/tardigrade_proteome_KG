@@ -240,6 +240,17 @@ class IGraphBuilder:
             'PROSITE_Annotation':    '#DA8BC3',
             None:                    '#CCCCCC',
         }
+        EDGE_TYPE_COLORS = {
+            'has_molecular_function': '#DD8452',
+            'located_in_cellular_component': '#55A868',
+            'involved_in_biological_process': '#C44E52',
+            'has_pfam_domain': '#8172B2',
+            'in_kegg_pathway': '#937860',
+            'has_prosite_annotation': '#DA8BC3',
+            'interacts_with': '#7B4173',
+            'embeddings_similar_to': "#2D00E1",
+            None: '#CCCCCC',
+        }
 
         g = self._sample_representative_subgraph(k=sample_k)
 
@@ -248,22 +259,28 @@ class IGraphBuilder:
         max_deg = max(degrees) if degrees else 1
         vertex_sizes = [10 + 30 * (d / max_deg) for d in degrees]
         labels = [str(v['name'])[:12] for v in g.vs]
+        # edge_labels = [f"{e['edge_type']} ({e['weight']:.2f})" for e in g.es]
+        edge_labels = [f"{e['weight']:.2f}" for e in g.es]
+        node_connectivity = [g.degree(v.index) for v in g.vs]
 
         layout = g.layout("fr")
         ig.plot(
             g,
             output_path,
             layout=layout,
-            bbox=(2400, 2400),
-            margin=80,
+            bbox=(4800, 4800),
+            margin=120,
             vertex_color=vertex_colors,
             vertex_size=vertex_sizes,
-            vertex_label=labels,
-            vertex_label_size=7,
+            vertex_label=[f"{label}\n({connectivity})" for label, connectivity in zip(labels, node_connectivity)],
+            vertex_label_size=10,
             vertex_label_color='#111111',
-            edge_width=0.6,
-            edge_arrow_size=0.4,
-            edge_color='#AAAAAA',
+            edge_width=0.8,
+            edge_arrow_size=0.6,
+            edge_color=[EDGE_TYPE_COLORS.get(e['edge_type'], '#CCCCCC') for e in g.es],
+                edge_label=edge_labels,
+                edge_label_size=8,
+                edge_label_color='#333333'
         )
 
         present_types = {v['node_type'] for v in g.vs}
