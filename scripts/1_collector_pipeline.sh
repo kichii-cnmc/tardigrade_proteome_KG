@@ -94,6 +94,5 @@ echo "DeepGO annotation collection completed."
 python3 src/1_collector/7_process_deepgo.py data/1_raw/deepgo_annotations/deepgo_annotations.tsv data/3_organized/DeepGO.tsv
 echo "DeepGO annotation processing completed."
 
-
 # end of script
 echo "Collector pipeline completed."
