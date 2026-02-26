@@ -326,6 +326,7 @@ if __name__ == "__main__":
     for file in files_in_folder:
         print(f"Processing file: {file}")
         graph_builder.add_to_graph_tsv(file)
+    graph_builder.filter_edges_by_weight(min_weight=0.5)  # Example threshold, adjust as needed
     graph_builder.evaluate_graph()
     graph_builder.visualize_graph("graph_visualization.png", sample_k = 4)
     graph_builder.output_triples("graph_triples.tsv")
