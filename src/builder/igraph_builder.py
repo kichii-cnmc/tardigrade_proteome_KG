@@ -120,7 +120,7 @@ class IGraphBuilder:
             for _, row in df.iterrows():
                 source = row.iloc[0]
                 target = row.iloc[1]
-                weight = row[weight_col] if weight_col and weight_col in df.columns else 1
+                weight = round(row.iloc[2], 4) if weight_col is None else 1
                 edges_list.append((source, target, weight))
             print(f"Adding edges of type '{edge_label}' from {tsv_file_path}...")
             # add nodes first to ensure all vertices exist before adding edges, then add edges in bulk
