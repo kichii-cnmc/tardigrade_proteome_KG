@@ -30,7 +30,6 @@ class IGraphBuilder:
         'Pfam_domains': 'Pfam_Domain',
         'KEGG_pathways': 'KEGG_Pathway',
         'PROSITE_annotations': 'PROSITE_Annotation',
-        'UniProt_ID': 'Protein',
         'PPI_target': 'Protein'
     }
     GRAPH_NODE_ALIAS_TYPES = ['NCBI_ID', 'Organism', 'Gene_Name', 'AF'] # columns that can be added as node attributes
@@ -114,7 +113,9 @@ class IGraphBuilder:
             print(f"File {tsv_file_path} is empty.")
             return
         second_col = df.columns[1]
-        if second_col in self.GRAPH_EDGE_LABELS:
+        # Handle pandas automatic column renaming for duplicates (e.g., 'UniProt_ID.1')
+        second_col_clean = second_col.split('.')[0] if '.' in second_col else second_col
+        if second_col_clean in self.GRAPH_EDGE_LABELS:
             edge_label, weight_col = self.GRAPH_EDGE_LABELS[second_col]
             edges_list = []
             for _, row in df.iterrows():
@@ -124,13 +125,13 @@ class IGraphBuilder:
                 edges_list.append((source, target, weight))
             print(f"Adding edges of type '{edge_label}' from {tsv_file_path}...")
             # add nodes first to ensure all vertices exist before adding edges, then add edges in bulk
-            node_type = self.GRAPH_NODE_LABELS.get(second_col, "UnknownType")
+            node_type = self.GRAPH_NODE_LABELS.get(second_col_clean, "UnknownType")
             if node_type == "UnknownType":
-                print(f"    Warning: No node type mapping found for column '{second_col}', defaulting to 'UnknownType'.")
+                print(f"    Warning: No node type mapping found for column '{second_col_clean}', defaulting to 'UnknownType'.")
             self.add_nodes_from_list([target for _, target, _ in edges_list], node_type=node_type)
             self.add_edges_from_list(edges_list, edge_type=edge_label)
-        elif second_col in self.GRAPH_NODE_LABELS:
-            node_type = self.GRAPH_NODE_LABELS[second_col]
+        elif second_col_clean in self.GRAPH_NODE_LABELS:
+            node_type = self.GRAPH_NODE_LABELS[second_col_clean]
             print(f"Adding nodes of type '{node_type}' from {tsv_file_path}...")
             self.add_nodes_from_list(df.iloc[:, 1].tolist(), node_type=node_type)
         else:
