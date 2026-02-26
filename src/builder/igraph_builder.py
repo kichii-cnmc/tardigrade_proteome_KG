@@ -157,7 +157,8 @@ class IGraphBuilder:
         for edge in self.graph.es[:5]:
             source = self.graph.vs[edge.source]["name"]
             target = self.graph.vs[edge.target]["name"]
-            print(f"({source}, {edge['edge_type']}, {target})")
+            weight = edge['weight']
+            print(f"({source}, {edge['edge_type']}, {target}, weight={weight})")
         print("Example Nodes:")
         for v in self.graph.vs[:5]:
             print(f"({v['name']}, {v['node_type']})")
