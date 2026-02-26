@@ -30,7 +30,8 @@ class IGraphBuilder:
         'Pfam_domains': 'Pfam_Domain',
         'KEGG_pathways': 'KEGG_Pathway',
         'PROSITE_annotations': 'PROSITE_Annotation',
-        'PPI_target': 'Protein'
+        'PPI_target': 'Protein',
+        'protein2': 'Protein'
     }
     GRAPH_NODE_ALIAS_TYPES = ['NCBI_ID', 'Organism', 'Gene_Name', 'AF'] # columns that can be added as node attributes
 
