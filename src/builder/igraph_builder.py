@@ -308,6 +308,11 @@ class IGraphBuilder:
         edges_to_remove = [e.index for e in self.graph.es if e['weight'] < min_weight]
         self.graph.delete_edges(edges_to_remove)
 
+    def filter_nodes_by_degree(self, min_degree):
+        '''Removes all nodes with degree below the specified threshold.'''
+        nodes_to_remove = [v.index for v in self.graph.vs if self.graph.degree(v.index) < min_degree]
+        self.graph.delete_vertices(nodes_to_remove)
+
     def output_nodes(self, output_path):
         with open(output_path, 'w') as f:
             for vertex in self.graph.vs:
@@ -329,6 +334,7 @@ if __name__ == "__main__":
         print(f"Processing file: {file}")
         graph_builder.add_to_graph_tsv(file)
     graph_builder.filter_edges_by_weight(min_weight=0.5)  # Example threshold, adjust as needed
+    graph_builder.filter_nodes_by_degree(min_degree=1)  # Example threshold, adjust as needed
     graph_builder.evaluate_graph()
     graph_builder.visualize_graph("graph_visualization.png", sample_k = 4)
     graph_builder.output_triples("graph_triples.tsv")
