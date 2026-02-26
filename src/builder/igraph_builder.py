@@ -300,6 +300,11 @@ class IGraphBuilder:
                 target = self.graph.vs[edge.target]["name"]
                 f.write(f"{source}\t{edge['edge_type']}\t{target}\n")
 
+    def filter_edges_by_weight(self, min_weight):
+        '''Removes all edges with weight below the specified threshold.'''
+        edges_to_remove = [e.index for e in self.graph.es if e['weight'] < min_weight]
+        self.graph.delete_edges(edges_to_remove)
+
     def output_nodes(self, output_path):
         with open(output_path, 'w') as f:
             for vertex in self.graph.vs:
