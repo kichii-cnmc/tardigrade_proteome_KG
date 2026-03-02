@@ -175,7 +175,7 @@ class IGraphBuilder:
             target = self.graph.vs[edge.target]["name"]
             weight = edge['weight']
             print(f"({source}, {edge['edge_type']}, {target}, weight={weight})")
-        print("Example Nodes:")
+        print("\nExample Nodes:")
         for v in self.graph.vs[:5]:
             print(f"({v['name']}, {v['node_type']})")
 
@@ -345,6 +345,25 @@ class IGraphBuilder:
             print(f"Node '{search_name}' not found in graph.")
             return None
         
+    def get_node_relations(self, search_name):
+        '''Returns node relations for the node with the given name.'''
+        node_id = self.identify_node(search_name)
+        if node_id is not None:
+            neighbors = self.graph.neighbors(node_id, mode="all")
+            relations = []
+            for neighbor in neighbors:
+                edge = self.graph.es.select(_source=node_id, _target=neighbor) or self.graph.es.select(_source=neighbor, _target=node_id)
+                if edge:
+                    edge_type = edge[0]['edge_type']
+                    neighbor_name = self.graph.vs[neighbor]['name']
+                    weight = edge[0]['weight']
+                    sentence = f"({search_name} {edge_type} {neighbor_name} ({weight})"
+                    relations.append(sentence)
+            return relations
+        else:
+            print(f"No relations found for '{search_name}' because the node does not exist.")
+            return []
+
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="Build a graph from TSV files using igraph.")
     argparser.add_argument("tsv_folder", type=str, help="Path to the folder containing TSV files.")
@@ -361,6 +380,10 @@ if __name__ == "__main__":
     graph_builder.filter_edges_by_weight(min_weight=0.5)  # Example threshold, adjust as needed
     graph_builder.filter_nodes_by_degree(min_degree=1)  # Example threshold, adjust as needed
     graph_builder.evaluate_graph()
+    print()
+    node_relations = graph_builder.get_node_relations("GAV06484.1")  # Example node name, adjust as needed
+    for relation in node_relations:
+        print(relation)
     graph_builder.visualize_graph("graph_visualization.png", sample_k = 4)
     graph_builder.output_triples("graph_triples.tsv")
     graph_builder.output_nodes("graph_nodes.tsv")
