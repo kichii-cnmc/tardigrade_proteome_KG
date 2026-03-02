@@ -35,6 +35,11 @@ def process_string_ppi_file(input_file, output_file, upid_folder=None, merged_id
     # divide score by 1000 to normalize between 0 and 1
     df['combined_score'] = df['combined_score'] / 1000.0
 
+    # normalize all scores to be between 0 and 1 by dividing by the maximum score in the dataset
+    max_score = df['combined_score'].max()
+    if max_score > 0:
+        df['combined_score'] = df['combined_score'] / max_score
+
     # rename columns to match KG building expectations
     df = df.rename(columns={'protein1': 'PPI_source', 'protein2': 'PPI_target', 'combined_score': 'score'})
 
