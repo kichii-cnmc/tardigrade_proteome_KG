@@ -81,8 +81,8 @@ bash src/1_collector/4_download_string_ppi.sh
 
 # process STRING PPI data
 # delete existing processed ppi files if they exist to avoid confusion
-python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/rv_ppi.txt data/3_organized/RV_STRING_ppi.tsv
-python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/he_ppi.txt data/3_organized/HE_STRING_ppi.tsv
+python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/rv_ppi.txt data/3_organized/RV_STRING_ppi.tsv --upid_folder data/3_organized
+python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/he_ppi.txt data/3_organized/HE_STRING_ppi.tsv --upid_folder data/3_organized
 echo "Protein information retrieval completed."
 
 # collect DeepGO annotations
@@ -91,9 +91,8 @@ python3 src/1_collector/6_collect_deepgo.py data/3_organized/ --output_file data
 echo "DeepGO annotation collection completed."
 
 # process DeepGO annotations to create edge list for graph building
-python3 src/1_collector/7_process_deepgo.py data/1_raw/deepgo_annotations/deepgo_annotations.tsv data/3_organized/DeepGO.tsv
+python3 src/1_collector/7_process_deepgo.py data/1_raw/deepgo_annotations/deepgo_annotations.tsv data/3_organized/DeepGO.tsv --upid_folder data/3_organized
 echo "DeepGO annotation processing completed."
-
 
 # end of script
 echo "Collector pipeline completed."

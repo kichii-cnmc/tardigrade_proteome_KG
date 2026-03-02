@@ -1,12 +1,27 @@
 # This script is used to process STRING PPI data txt files into TSV files for KG building.
 
 import pandas as pd
+import os
+
+def find_uniprot_tsvs(folder_path):
+    '''Finds all TSV files in the specified folder with UniProt IDs (as second column) and returns a list of their paths.'''
+    tsv_files = []
+    for filename in os.listdir(folder_path):
+        if filename.endswith('.tsv'):
+            file_path = os.path.join(folder_path, filename)
+            try:
+                df = pd.read_csv(file_path, sep='\t')
+                if len(df.columns) > 1 and df.columns[1].startswith('UniProt_ID'):
+                    tsv_files.append(file_path)
+            except Exception as e:
+                print(f"Error reading {file_path}: {e}")
+    return tsv_files
 
 def isolate_protein_id(protein_string):
     '''Isolates the protein ID from a STRING protein string.'''
     return protein_string.split('.')[1] if '.' in protein_string else protein_string
 
-def process_string_ppi_file(input_file, output_file, merged_ids_file=None):
+def process_string_ppi_file(input_file, output_file, upid_folder=None, merged_ids_file=None):
     '''Processes a STRING PPI text file and saves it as a TSV file.'''
     df = pd.read_csv(input_file, sep=' ')
 
@@ -27,6 +42,23 @@ def process_string_ppi_file(input_file, output_file, merged_ids_file=None):
     if merged_ids_file:
         conversion_dict = build_merged_ids_conversion_dict(merged_ids_file)
         df = convert_merged_ids_in_ppi(df, conversion_dict)
+
+    if upid_folder:
+        upid_files = find_uniprot_tsvs(upid_folder)
+        if upid_files:
+            print(f"Found {len(upid_files)} UniProt ID TSV files for sequence filtering.")
+            valid_uniprot_ids = set()
+            for upid_file in upid_files:
+                # build a set of valid UniProt IDs from the files
+                upid_df = pd.read_csv(upid_file, sep='\t')
+                if len(upid_df.columns) > 1 and upid_df.columns[1].startswith('UniProt_ID'):
+                    valid_uniprot_ids.update(upid_df.iloc[:, 1].dropna().astype(str).tolist())
+            print(f"Total unique valid UniProt IDs collected: {len(valid_uniprot_ids)}")
+            # filter the PPI DataFrame to keep only rows where both source and target are in the valid UniProt ID set
+            df = df[df['PPI_source'].isin(valid_uniprot_ids) & df['PPI_target'].isin(valid_uniprot_ids)]
+            print(f"PPI data filtered to {len(df)} interactions after applying UniProt ID filtering.")
+        else:
+            print(f"No UniProt ID TSV files found in {upid_folder}. Skipping UniProt ID filtering.")
 
     df.to_csv(output_file, sep='\t', index=False)
 
@@ -54,9 +86,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process STRING PPI data file into TSV format.')
     parser.add_argument('input_file', type=str, help='Path to the input STRING PPI text file.')
     parser.add_argument('output_file', type=str, help='Path to the output TSV file.')
+    parser.add_argument('--upid_folder', type=str, default=None, help='Path to the folder containing UniProt IDs TSV files for ID filtering.')
     parser.add_argument('--merge', type=str, default=None, help='Path to the merged UniProt IDs TSV file.')
     args = parser.parse_args()
 
     print("Processing STRING PPI data...")
-    process_string_ppi_file(args.input_file, args.output_file, args.merge)
+    process_string_ppi_file(args.input_file, args.output_file, args.upid_folder, args.merge)
     print(f"Processed STRING PPI data saved to {args.output_file}.")

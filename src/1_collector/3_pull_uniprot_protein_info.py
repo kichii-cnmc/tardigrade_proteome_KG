@@ -367,6 +367,11 @@ def save_dataframe_to_separate_tsvs(df: pd.DataFrame, output_prefix: str) -> Non
     for column in df.columns:
         output_tsv = f"{output_prefix}_{column}.tsv"
         df_subset = df[[df.columns[0], column]]  # Include primary ID column
+        # if the column contains lists, explode them into separate rows
+        if df_subset[column].apply(lambda x: isinstance(x, str) and ';' in x).any():
+            df_subset = df_subset.assign(**{column: df_subset[column].str.split(';')}).explode(column)
+        # do not include rows where the column value is empty or NaN
+        df_subset = df_subset[df_subset[column].notna() & (df_subset[column] != '')]
         df_subset.to_csv(output_tsv, sep='\t', index=False)
         print(f"Saved {len(df_subset)} records to {output_tsv}")
 
