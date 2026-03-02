@@ -9,10 +9,8 @@ This script fetches protein information from the UniProt API including:
 - PDB/AlphaFold structure IDs
 - Gene sequences
 
-Supports multiple processing methods: async, batch, and sequential.
+Supports batch processing only.
 """
-
-import asyncio
 import argparse
 import time
 from typing import Dict, List, Optional, Tuple, Any
@@ -42,55 +40,6 @@ OUTPUT_HEADERS = [
     "Pfam_domains", "KEGG_pathways", "PROSITE_annotations", 
     "PDB_structures", "AF_structures"
 ]
-
-async def fetch_uniprot_info_async(
-    session: aiohttp.ClientSession, 
-    uniprot_id: str, 
-    semaphore: asyncio.Semaphore, 
-    max_retries: int = MAX_RETRIES
-) -> Optional[Dict[str, Any]]:
-    """
-    Asynchronously fetches protein information from the UniProt API.
-    
-    Args:
-        session: aiohttp client session
-        uniprot_id: UniProt accession ID
-        semaphore: Concurrency limiter
-        max_retries: Maximum number of retry attempts
-        
-    Returns:
-        Parsed protein information dictionary or None if failed
-    """
-    params = {"fields": UNIPROT_FIELDS}
-    base_url = f"{UNIPROT_BASE_URL}/{uniprot_id}.json"
-    
-    async with semaphore:  # Limit concurrent requests
-        for attempt in range(max_retries):
-            try:
-                timeout = aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT)
-                async with session.get(base_url, params=params, timeout=timeout) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return parse_uniprot_data(data, uniprot_id)
-                    elif response.status == 429:  # Rate limited
-                        wait_time = 2 ** attempt  # Exponential backoff
-                        print(f"Rate limited for {uniprot_id}, waiting {wait_time}s...")
-                        await asyncio.sleep(wait_time)
-                        continue
-                    else:
-                        if attempt == max_retries - 1:
-                            print(f"Failed to fetch data for {uniprot_id}: HTTP {response.status}")
-                        continue
-            except asyncio.TimeoutError:
-                if attempt == max_retries - 1:
-                    print(f"Timeout after {DEFAULT_TIMEOUT}s for {uniprot_id}")
-                await asyncio.sleep(1)
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    print(f"Unexpected error for {uniprot_id}: {type(e).__name__}: {e}")
-                await asyncio.sleep(1)
-    
-    return None
 
 def fetch_uniprot_batch(uniprot_ids_batch: List[str]) -> Dict[str, Dict[str, Any]]:
     """
@@ -375,52 +324,6 @@ def save_dataframe_to_separate_tsvs(df: pd.DataFrame, output_prefix: str) -> Non
         df_subset.to_csv(output_tsv, sep='\t', index=False)
         print(f"Saved {len(df_subset)} records to {output_tsv}")
 
-async def process_proteins_async(
-    uniprot_ids: List[str], 
-    ncbi_ids: List[str], 
-    max_concurrent: int = DEFAULT_MAX_CONCURRENT
-) -> pd.DataFrame:
-    """
-    Process proteins asynchronously with controlled concurrency.
-    
-    Args:
-        uniprot_ids: List of UniProt IDs to process
-        ncbi_ids: List of corresponding NCBI IDs  
-        max_concurrent: Maximum number of concurrent requests
-        
-    Returns:
-        DataFrame containing protein information
-    """
-    semaphore = asyncio.Semaphore(max_concurrent)
-    
-    async with aiohttp.ClientSession() as session:
-        # Create tasks for all proteins
-        tasks = [
-            fetch_uniprot_info_async(session, uniprot_id, semaphore)
-            for uniprot_id in uniprot_ids
-        ]
-        
-        results = []
-        
-        # Process results as they complete
-        print(f"Processing {len(tasks)} proteins...")
-        completed = 0
-        
-        for i, task in enumerate(asyncio.as_completed(tasks)):
-            info = await task
-            uniprot_id = uniprot_ids[i]
-            ncbi_id = ncbi_ids[i] if i < len(ncbi_ids) else ""
-            
-            row_dict = format_protein_row_dict(uniprot_id, ncbi_id, info)
-            results.append(row_dict)
-            
-            completed += 1
-            if completed % 10 == 0:
-                print(f"Processed {completed}/{len(tasks)} proteins")
-    
-    return pd.DataFrame(results)
-
-
 def process_proteins_batch(
     uniprot_ids: List[str], 
     ncbi_ids: List[str], 
@@ -495,92 +398,38 @@ def parse_input_tsv(input_tsv: str) -> Tuple[List[str], List[str]]:
                 ncbi_ids.append("")
     return uniprot_ids, ncbi_ids
 
-
-def process_proteins_sequential(
-    uniprot_ids: List[str], 
-    ncbi_ids: List[str]
-) -> pd.DataFrame:
-    """
-    Process proteins sequentially (original method, kept for compatibility).
-    
-    Args:
-        uniprot_ids: List of UniProt IDs to process
-        ncbi_ids: List of corresponding NCBI IDs
-        
-    Returns:
-        DataFrame containing protein information
-    """
-    results = []
-    
-    print(f"Processing {len(uniprot_ids)} proteins sequentially...")
-    
-    for i, (uniprot_id, ncbi_id) in enumerate(zip(uniprot_ids, ncbi_ids)):
-        if (i + 1) % 10 == 0:
-            print(f"Processed {i + 1}/{len(uniprot_ids)} proteins")
-        
-        info = fetch_uniprot_info(uniprot_id)
-        row_dict = format_protein_row_dict(uniprot_id, ncbi_id, info)
-        results.append(row_dict)
-    
-    return pd.DataFrame(results)
-
-
 def main() -> None:
     """
     Main function to handle command-line arguments and orchestrate protein processing.
     """
     parser = argparse.ArgumentParser(
-        description="Fetch protein information from UniProt API",
-        epilog="Supports async, batch, and sequential processing methods for optimal performance."
+        description="Fetch protein information from UniProt API"
     )
     parser.add_argument("input_tsv", help="Input TSV file with UniProt IDs")
     parser.add_argument("output_tsv", help="Output TSV file to write protein information")
-    parser.add_argument(
-        "--method", 
-        choices=["async", "batch", "sequential"], 
-        default="batch",
-        help="Processing method (default: batch)"
-    )
-    parser.add_argument(
-        "--max-concurrent", 
-        type=int, 
-        default=DEFAULT_MAX_CONCURRENT,
-        help=f"Maximum concurrent requests for async method (default: {DEFAULT_MAX_CONCURRENT})"
-    )
     parser.add_argument(
         "--batch-size", 
         type=int, 
         default=DEFAULT_BATCH_SIZE,
         help=f"Batch size for batch method (default: {DEFAULT_BATCH_SIZE})"
     )
+    parser.add_argument("--test_mode", action='store_true', help="If set, processes only a small subset of data for testing")
     args = parser.parse_args()
 
     # Load UniProt and NCBI IDs from input file
     uniprot_ids, ncbi_ids = parse_input_tsv(args.input_tsv)
     
-    print(f"Processing {len(uniprot_ids)} proteins using {args.method} method...")
+    if args.test_mode:
+        test_size = min(60, len(uniprot_ids))
+        uniprot_ids = uniprot_ids[:test_size]
+        ncbi_ids = ncbi_ids[:test_size]
+        print(f"Test mode enabled: processing only {test_size} proteins.")
 
     # Process proteins using selected method
     start_time = time.time()
+    df = process_proteins_batch(uniprot_ids, ncbi_ids, args.batch_size)
     
-    if args.method == "async":
-        try:
-            df = asyncio.run(process_proteins_async(
-                uniprot_ids, ncbi_ids, args.max_concurrent
-            ))
-        except ImportError:
-            print("Warning: aiohttp not available. Install with: pip install aiohttp")
-            print("Falling back to batch method...")
-            df = process_proteins_batch(uniprot_ids, ncbi_ids, args.batch_size)
-            
-    elif args.method == "batch":
-        df = process_proteins_batch(uniprot_ids, ncbi_ids, args.batch_size)
-        
-    else:  # sequential method
-        df = process_proteins_sequential(uniprot_ids, ncbi_ids)
-    
-    # Save DataFrame to TSV
-    # save_dataframe_to_tsv(df, args.output_tsv)
+    # Save DataFrame to individual TSV
     save_dataframe_to_separate_tsvs(df, args.output_tsv.replace('.tsv', ''))
     
     # Report timing
