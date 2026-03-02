@@ -10,6 +10,26 @@ matplotlib.use('Agg')  # non-interactive backend — must be set before pyplot i
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
+class AliasManager:
+    def __init__(self):
+        self.alias_to_name = {}
+        self.names_to_aliases = {}
+    
+    def add_alias(self, alias, node_name):
+        # add alias to node_name mapping
+        if alias in self.alias_to_name:
+            if self.alias_to_name[alias] != node_name:
+                print(f"Warning: Alias '{alias}' already mapped to '{self.alias_to_name[alias]}', cannot remap to '{node_name}'.")
+        else:
+            self.alias_to_name[alias] = node_name
+            self.names_to_aliases.setdefault(node_name, set()).add(alias)
+    
+    def get_node_name(self, alias):
+        return self.alias_to_name.get(alias, None)
+    
+    def get_aliases(self, node_name):
+        return self.names_to_aliases.get(node_name, set())
+
 class IGraphBuilder:
     DIRECTED_GRAPH = True
     GRAPH_EDGE_LABELS = { # column name: (edge label, weight)
@@ -34,7 +54,7 @@ class IGraphBuilder:
         'protein2': 'Protein'
     }
     GRAPH_NODE_ALIAS_TYPES = ['NCBI_ID', 'Organism', 'Gene_Name', 'AF_structures'] # columns that can be added as node attributes
-    ALIAS_MAP = {} # alias -> node name mapping for quick lookup
+    ALIAS_MAPPER = AliasManager()
 
     def __init__(self):
         self.graph = ig.Graph(directed=self.DIRECTED_GRAPH)
@@ -106,13 +126,9 @@ class IGraphBuilder:
             )
 
     def add_alias_attributes_from_list(self, alias_list):
-        '''Add alias attributes by creating a key-value mapping for alias-node associations. Alias list = (alias_value, node_name)'''
+        '''Add alias list to mapping object. Alias list = (alias_value, node_name)'''
         for alias_value, node_name in alias_list:
-            if not alias_value in self.ALIAS_MAP:
-                self.ALIAS_MAP[alias_value] = node_name
-            else:
-                if self.ALIAS_MAP[alias_value] != node_name:
-                    print(f"Warning: Alias '{alias_value}' already mapped to '{self.ALIAS_MAP[alias_value]}', cannot remap to '{node_name}'.")
+            self.ALIAS_MAPPER.add_alias(alias_value, node_name)
 
     def add_to_graph_tsv(self, tsv_file_path):
         '''Add nodes and edges from a TSV file, determines the correct format based on the 2nd column name.'''
@@ -336,14 +352,11 @@ class IGraphBuilder:
 
     def identify_node(self, search_name):
         '''Returns the graph ID of the node with the given name, or None if not found.'''
-        if search_name in self.ALIAS_MAP:
-            search_name = self.ALIAS_MAP[search_name]
-        selected = self.graph.vs.select(name=search_name)
-        if selected:
-            return selected[0].index
-        else:            
+        search_name = self.ALIAS_MAPPER.get_node_name(search_name) or search_name
+        node_id = self.graph.vs.find(name=search_name).index if self.graph.vs.select(name=search_name) else None
+        if node_id is None:
             print(f"Node '{search_name}' not found in graph.")
-            return None
+        return node_id
         
     def get_node_relations(self, search_name):
         '''Returns node relations for the node with the given name.'''
@@ -359,6 +372,10 @@ class IGraphBuilder:
                     weight = edge[0]['weight']
                     sentence = f"({search_name} {edge_type} {neighbor_name} ({weight})"
                     relations.append(sentence)
+            node_name = self.ALIAS_MAPPER.get_node_name(search_name) or search_name
+            aliases = self.ALIAS_MAPPER.get_aliases(node_name)
+            if aliases:
+                relations.append(f"Aliases for {node_name}: {', '.join(aliases)}")
             return relations
         else:
             print(f"No relations found for '{search_name}' because the node does not exist.")
