@@ -362,6 +362,7 @@ class IGraphBuilder:
         '''Returns node relations for the node with the given name.'''
         node_id = self.identify_node(search_name)
         if node_id is not None:
+            node_name = self.ALIAS_MAPPER.get_node_name(search_name) or search_name
             neighbors = self.graph.neighbors(node_id, mode="all")
             relations = []
             for neighbor in neighbors:
@@ -370,9 +371,8 @@ class IGraphBuilder:
                     edge_type = edge[0]['edge_type']
                     neighbor_name = self.graph.vs[neighbor]['name']
                     weight = edge[0]['weight']
-                    sentence = f"({search_name} {edge_type} {neighbor_name} ({weight})"
+                    sentence = f"{node_name} {edge_type} {neighbor_name} ({weight})"
                     relations.append(sentence)
-            node_name = self.ALIAS_MAPPER.get_node_name(search_name) or search_name
             aliases = self.ALIAS_MAPPER.get_aliases(node_name)
             if aliases:
                 relations.append(f"Aliases for {node_name}: {', '.join(aliases)}")
@@ -401,6 +401,7 @@ if __name__ == "__main__":
     node_relations = graph_builder.get_node_relations("GAV06484.1")  # Example node name, adjust as needed
     for relation in node_relations:
         print(relation)
+    print()
     graph_builder.visualize_graph("graph_visualization.png", sample_k = 4)
     graph_builder.output_triples("graph_triples.tsv")
     graph_builder.output_nodes("graph_nodes.tsv")
