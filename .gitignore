@@ -4,6 +4,7 @@
 *.npz
 *.png
 *.tsv
+*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

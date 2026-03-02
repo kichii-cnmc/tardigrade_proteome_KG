@@ -55,12 +55,6 @@ log_download "data/1_raw/rv_proteome/rv_ncbi_proteome.faa" \
              "947166" \
              "GCA_001949185.1"
 
-# Stop here if testing flag is set
-if [ "$TEST_MODE" = true ]; then
-    echo "Test Mode - Stopping Downloads Early"
-    exit 0
-fi
-
 # Hypsibius exemplaris genome directory
 mkdir -p data/1_raw/he_proteome
 

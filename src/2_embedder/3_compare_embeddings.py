@@ -62,7 +62,7 @@ if __name__ == "__main__":
     
     if args.test_mode:
         # Process only a small subset of data for testing
-        test_size = min(1000, len(embedding_dict))
+        test_size = min(100, len(embedding_dict))
         embedding_dict = {k: embedding_dict[k] for k in list(embedding_dict.keys())[:test_size]}
         print(f"Test mode enabled: processing only {test_size} embeddings.")
 
@@ -103,6 +103,10 @@ if __name__ == "__main__":
         'protein2': [protein_ids[j] for j in indices[1]], 
         'embedding_similarity': similarity_matrix[indices]
     })
+    
+    # Fast sort by similarity in descending order using numpy argsort
+    sort_indices = np.argsort(-similarity_matrix[indices])
+    edge_list_df = edge_list_df.iloc[sort_indices]
     
     edge_list_df.to_csv(output_list_path, sep='\t', index=False, float_format='%.4f')
     time_end = time()

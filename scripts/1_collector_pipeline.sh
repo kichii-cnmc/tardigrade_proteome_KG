@@ -21,7 +21,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # clear logging file
-LOG_FILE = "logs/download_metadata.json"
+LOG_FILE="logs/download_metadata.json"
 if [ -f "$LOG_FILE" ]; then
     rm "$LOG_FILE"
     echo "Cleared existing download log file."
@@ -32,8 +32,14 @@ rm -rf data/3_organized/*.tsv
 echo "Cleared existing organized data files."
 echo
 
+# announce if test mode is enabled
+if [ "$TEST_MODE" = true ]; then
+    echo "Test mode enabled: The genome download and processing will run on a smaller subset of data for testing purposes."
+    echo
+fi
+
 # run the genome download script
-bash src/1_collector/1_download_genomes.sh $(if [ "$TEST_MODE" = true ]; then echo "-t"; fi)
+bash src/1_collector/1_download_genomes.sh
 echo "Genome download completed."
 echo
 
@@ -48,47 +54,45 @@ fi
 echo "Merging of FASTA files completed."
 echo
 
-# if in test mode, make the merged files smaller for testing
+# if in test mode, make the merged files smaller and remove original merged files to save space
 if [ "$TEST_MODE" = true ]; then
-    echo "Test mode enabled: Reducing merged files to first 50 entries for testing."
+    echo "Test mode enabled: Reducing merged files to first 100 entries for testing."
     if [[ -f "data/2_merged/merged_RV.tsv" ]]; then
-        head -n 51 data/2_merged/merged_RV.tsv > data/2_merged/test_RV.tsv
+        head -n 101 data/2_merged/merged_RV.tsv > data/2_merged/temp_RV.tsv
+        mv data/2_merged/temp_RV.tsv data/2_merged/merged_RV.tsv
+        rm -f data/2_merged/temp_RV.tsv
     fi
     if [[ -f "data/2_merged/merged_HE.tsv" ]]; then
-        head -n 51 data/2_merged/merged_HE.tsv > data/2_merged/test_HE.tsv
+        head -n 101 data/2_merged/merged_HE.tsv > data/2_merged/temp_HE.tsv
+        mv data/2_merged/temp_HE.tsv data/2_merged/merged_HE.tsv
+        rm -f data/2_merged/temp_HE.tsv
     fi
 fi
 
-# run the protein info pull script on each test file
-if [ "$TEST_MODE" = true ]; then
-    echo "Test mode enabled: Pulling protein info for test files."
-    if [[ -f "data/2_merged/test_RV.tsv" ]]; then
-    python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/test_RV.tsv data/3_organized/test_UniProt_RV.tsv
-    fi
-    if [[ -f "data/2_merged/test_HE.tsv" ]]; then
-        python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/test_HE.tsv data/3_organized/test_UniProt_HE.tsv
-    fi
-fi
-
-# run the protein info pull script on each full file if not in test mode
-if [ "$TEST_MODE" = false ]; then
-    if [[ -f "data/2_merged/merged_RV.tsv" ]]; then
-        python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_RV.tsv data/3_organized/UniProt_RV.tsv
-    fi  
-    if [[ -f "data/2_merged/merged_HE.tsv" ]]; then
-        python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_HE.tsv data/3_organized/UniProt_HE.tsv
-    fi
-fi
+# run the protein info pull script on each file
+python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_RV.tsv data/3_organized/RV.tsv --method batch
+python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_HE.tsv data/3_organized/HE.tsv --method batch
 
 # collect STRING PPI data
+# delete existing string PPI files
+rm -f data/1_raw/string_ppi/rv_ppi.txt
+rm -f data/1_raw/string_ppi/he_ppi.txt
 bash src/1_collector/4_download_string_ppi.sh
 
 # process STRING PPI data
-if [[ -f "data/1_raw/string_ppi/rv_ppi.txt" ]]; then
-    python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/rv_ppi.txt data/3_organized/STRING_RV_PPI.tsv
-fi
-if [[ -f "data/1_raw/string_ppi/he_ppi.txt" ]]; then
-    python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/he_ppi.txt data/3_organized/STRING_HE_PPI.tsv
-fi
-
+# delete existing processed ppi files if they exist to avoid confusion
+python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/rv_ppi.txt data/3_organized/RV_STRING_ppi.tsv --upid_folder data/3_organized
+python3 src/1_collector/5_string_ppi_processor.py data/1_raw/string_ppi/he_ppi.txt data/3_organized/HE_STRING_ppi.tsv --upid_folder data/3_organized
 echo "Protein information retrieval completed."
+
+# collect DeepGO annotations
+mkdir -p data/1_raw/deepgo_annotations
+python3 src/1_collector/6_collect_deepgo.py data/3_organized/ --output_file data/1_raw/deepgo_annotations/deepgo_annotations.tsv $(if [ "$TEST_MODE" = true ]; then echo "--test_mode"; fi)
+echo "DeepGO annotation collection completed."
+
+# process DeepGO annotations to create edge list for graph building
+python3 src/1_collector/7_process_deepgo.py data/1_raw/deepgo_annotations/deepgo_annotations.tsv data/3_organized/DeepGO.tsv --upid_folder data/3_organized
+echo "DeepGO annotation processing completed."
+
+# end of script
+echo "Collector pipeline completed."
