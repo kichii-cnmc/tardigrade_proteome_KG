@@ -33,7 +33,8 @@ class IGraphBuilder:
         'PPI_target': 'Protein',
         'protein2': 'Protein'
     }
-    GRAPH_NODE_ALIAS_TYPES = ['NCBI_ID', 'Organism', 'Gene_Name', 'AF'] # columns that can be added as node attributes
+    GRAPH_NODE_ALIAS_TYPES = ['NCBI_ID', 'Organism', 'Gene_Name', 'AF_structures'] # columns that can be added as node attributes
+    ALIAS_MAP = {} # alias -> node name mapping for quick lookup
 
     def __init__(self):
         self.graph = ig.Graph(directed=self.DIRECTED_GRAPH)
@@ -104,6 +105,15 @@ class IGraphBuilder:
                 attributes={'edge_type': [edge_type] * len(new_edges), 'weight': weights}
             )
 
+    def add_alias_attributes_from_list(self, alias_list):
+        '''Add alias attributes by creating a key-value mapping for alias-node associations. Alias list = (alias_value, node_name)'''
+        for alias_value, node_name in alias_list:
+            if not alias_value in self.ALIAS_MAP:
+                self.ALIAS_MAP[alias_value] = node_name
+            else:
+                if self.ALIAS_MAP[alias_value] != node_name:
+                    print(f"Warning: Alias '{alias_value}' already mapped to '{self.ALIAS_MAP[alias_value]}', cannot remap to '{node_name}'.")
+
     def add_to_graph_tsv(self, tsv_file_path):
         '''Add nodes and edges from a TSV file, determines the correct format based on the 2nd column name.'''
         if not os.path.exists(tsv_file_path):
@@ -135,6 +145,10 @@ class IGraphBuilder:
             node_type = self.GRAPH_NODE_LABELS[second_col_clean]
             print(f"Adding nodes of type '{node_type}' from {tsv_file_path}...")
             self.add_nodes_from_list(df.iloc[:, 1].tolist(), node_type=node_type)
+        elif second_col_clean in self.GRAPH_NODE_ALIAS_TYPES:
+            print(f"Adding alias attributes from {tsv_file_path}...")
+            alias_list = list(zip(df.iloc[:, 1].tolist(), df.iloc[:, 0].tolist())) # swap to (alias_value, node_name) format
+            self.add_alias_attributes_from_list(alias_list)
         else:
             print(f"Unrecognized format in {tsv_file_path}, skipping.")
 
