@@ -334,6 +334,17 @@ class IGraphBuilder:
                 node_type = vertex["node_type"]
                 f.write(f"{name}\t{node_type}\n")
 
+    def identify_node(self, search_name):
+        '''Returns the graph ID of the node with the given name, or None if not found.'''
+        if search_name in self.ALIAS_MAP:
+            search_name = self.ALIAS_MAP[search_name]
+        selected = self.graph.vs.select(name=search_name)
+        if selected:
+            return selected[0].index
+        else:            
+            print(f"Node '{search_name}' not found in graph.")
+            return None
+        
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="Build a graph from TSV files using igraph.")
     argparser.add_argument("tsv_folder", type=str, help="Path to the folder containing TSV files.")
