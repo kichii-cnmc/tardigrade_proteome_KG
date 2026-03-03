@@ -322,22 +322,38 @@ class DataValidator:
         
     def count_unique_assignments(self):
         '''Counts the number of unique protein-function/domain assignments in the dataset and adds it to the report.'''
+        '''Checks for duplicate assignments (same protein assigned to same function/domain multiple times) and adds it to the report.'''
         if 'UniProt_ID' in self.data.columns and ('DeepGO_BP' in self.data.columns or 'DeepGO_MF' in self.data.columns or 'DeepGO_CC' in self.data.columns):
             unique_assignments = set()
+            duplicate_assignments_count = 0
             if 'DeepGO_BP' in self.data.columns:
                 unique_assignments.update(set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['DeepGO_BP'].dropna().astype(str).tolist())))
+                duplicate_assignments_count += len(self.data) - len(set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['DeepGO_BP'].dropna().astype(str).tolist())))
             if 'DeepGO_MF' in self.data.columns:
                 unique_assignments.update(set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['DeepGO_MF'].dropna().astype(str).tolist())))
+                duplicate_assignments_count += len(self.data) - len(set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['DeepGO_MF'].dropna().astype(str).tolist())))
             if 'DeepGO_CC' in self.data.columns:
                 unique_assignments.update(set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['DeepGO_CC'].dropna().astype(str).tolist())))
+                duplicate_assignments_count += len(self.data) - len(set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['DeepGO_CC'].dropna().astype(str).tolist())))
+            if duplicate_assignments_count > 0:
+                print(f"Warning: Found {duplicate_assignments_count} duplicate protein-function assignments in {self.dataset_name}.")
+                self.report['!! Number of Duplicate Assignments'] = duplicate_assignments_count
             self.report['Number of Unique Protein-Function Assignments'] = len(unique_assignments)
             return len(unique_assignments)
         elif 'UniProt_ID' in self.data.columns and 'Pfam_domains' in self.data.columns:
             unique_assignments = set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['Pfam_domains'].dropna().astype(str).tolist()))
+            duplicate_assignments_count = len(self.data) - len(unique_assignments)
+            if duplicate_assignments_count > 0:
+                print(f"Warning: Found {duplicate_assignments_count} duplicate protein-domain assignments in {self.dataset_name}.")
+                self.report['!! Number of Duplicate Assignments'] = duplicate_assignments_count
             self.report['Number of Unique Protein-Domain Assignments'] = len(unique_assignments)
             return len(unique_assignments)
         elif 'UniProt_ID' in self.data.columns and 'PROSITE_annotations' in self.data.columns:
             unique_assignments = set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['PROSITE_annotations'].dropna().astype(str).tolist()))
+            duplicate_assignments_count = len(self.data) - len(unique_assignments)
+            if duplicate_assignments_count > 0:
+                print(f"Warning: Found {duplicate_assignments_count} duplicate protein-domain assignments in {self.dataset_name}.")
+                self.report['!! Number of Duplicate Assignments'] = duplicate_assignments_count
             self.report['Number of Unique Protein-Domain Assignments'] = len(unique_assignments)
             return len(unique_assignments)
         else:
