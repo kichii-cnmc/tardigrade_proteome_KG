@@ -51,6 +51,26 @@ class DataValidator:
         self.report['Number of Unique Proteins'] = len(unique_proteins)
         self.report['Number of Non-Unique or Duplicate Proteins'] = non_unique_proteins_count
         return len(unique_proteins)
+    
+    def check_id_consistency(self):
+        '''Checks that all UniProt IDs in the dataset are present in the base ID list.'''
+        if 'UniProt_ID' in self.data.columns:
+            dataset_ids = set(self.data['UniProt_ID'].dropna().astype(str).tolist())
+        elif 'PPI_source' in self.data.columns and 'PPI_target' in self.data.columns:
+            dataset_ids = set(self.data['PPI_source'].dropna().astype(str).tolist() + self.data['PPI_target'].dropna().astype(str).tolist())
+        else:
+            print(f"Warning: No UniProt_ID or PPI_source/PPI_target columns found in {self.dataset_name} for consistency check.")
+            return None
+        # ids present in dataset but not in base list
+        inconsistent_ids = dataset_ids - set(self.base_id_list)
+        self.report['Number of IDs Not in Base List'] = len(inconsistent_ids)
+        self.report['Percentage of IDs Not in Base List'] = (len(inconsistent_ids) / len(dataset_ids) * 100) if len(dataset_ids) > 0 else 0
+        # ids present in base list but not in dataset (coverage gap for dataset)
+        missing_ids = set(self.base_id_list) - dataset_ids
+        self.report['Number of IDs in Base List Not in Dataset'] = len(missing_ids)
+        self.report['Percentage of IDs in Base List Not in Dataset'] = (len(missing_ids) / len(self.base_id_list) * 100) if len(self.base_id_list) > 0 else 0
+        return inconsistent_ids, missing_ids
+
 
 if __name__ == "__main__":
     # Load base UniProt ID list from the protein info datasets for consistency checks
