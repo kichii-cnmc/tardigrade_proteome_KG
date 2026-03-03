@@ -133,7 +133,37 @@ class DataValidator:
             print(f"Warning: No score or embedding_similarity column found in {self.dataset_name} for score distribution measurement.")
             return None
         
-
+    def measure_relationships_per_source(self, plot_output=None):
+        '''Measures the number of relationships/interactions per source protein and adds it to the report, plotting a histogram if specified.'''
+        if 'PPI_source' in self.data.columns:
+            relationships_per_source = self.data.groupby('PPI_source').size()
+            self.report['Relationships per Source Mean'] = relationships_per_source.mean()
+            self.report['Relationships per Source Median'] = relationships_per_source.median()
+            self.report['Relationships per Source Range'] = relationships_per_source.min(), relationships_per_source.max()
+            if plot_output:
+                plt.figure(figsize=(10, 6))
+                sns.histplot(relationships_per_source, bins=50, kde=True)
+                plt.title(f'Relationships per Source Protein for {self.dataset_name.replace("_", " ").replace(".tsv", "")}')
+                plt.xlabel('Number of Relationships')
+                plt.ylabel('Frequency')
+                plt.savefig(plot_output)
+            return self.report
+        elif 'protein1' in self.data.columns:
+            relationships_per_source = self.data.groupby('protein1').size()
+            self.report['Relationships per Source Mean'] = relationships_per_source.mean()
+            self.report['Relationships per Source Median'] = relationships_per_source.median()
+            self.report['Relationships per Source Range'] = relationships_per_source.min(), relationships_per_source.max()
+            if plot_output:
+                plt.figure(figsize=(10, 6))
+                sns.histplot(relationships_per_source, bins=50, kde=True)
+                plt.title(f'Relationships per Source Protein for {self.dataset_name.replace("_", " ").replace(".tsv", "")}')
+                plt.xlabel('Number of Relationships')
+                plt.ylabel('Frequency')
+                plt.savefig(plot_output)
+            return self.report
+        else:
+            print(f"Warning: No PPI_source or protein1 column found in {self.dataset_name} for relationships per source measurement.")
+            return None
 
 if __name__ == "__main__":
     # Load base UniProt ID list from the protein info datasets for consistency checks
