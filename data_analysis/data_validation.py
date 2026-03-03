@@ -323,6 +323,82 @@ class DataValidator:
         else:
             print(f"Warning: No UniProt_ID column found along with GO Term, Pfam Domain, or PROSITE Domain column in {self.dataset_name} for unique assignment counting.")
             return None
+        
+    def measure_assignments_per_protein(self, plot_output=None):
+        '''Measures the number of function/domain assignments per protein and adds it to the report, plotting a histogram if specified.'''
+        if 'UniProt_ID' in self.data.columns and ('DeepGO_BP' in self.data.columns or 'DeepGO_MF' in self.data.columns or 'DeepGO_CC' in self.data.columns):
+            assignments_per_protein = self.data.groupby('UniProt_ID').size()
+            self.report['Assignments per Protein Mean'] = round(assignments_per_protein.mean(), 2)
+            self.report['Assignments per Protein Median'] = round(assignments_per_protein.median(), 2)
+            self.report['Assignments per Protein Range'] = round(assignments_per_protein.min(), 2), round(assignments_per_protein.max(), 2)
+            if plot_output:
+                plt.figure(figsize=(10, 6))
+                sns.histplot(assignments_per_protein, bins=50, kde=True)
+                plt.title(f'Assignments per Protein for {self.dataset_name}')
+                plt.xlabel('Number of Assignments')
+                plt.ylabel('Frequency')
+                plt.savefig(plot_output)
+            return self.report
+        elif 'UniProt_ID' in self.data.columns and ('Pfam_domain' in self.data.columns or 'PROSITE_annotations' in self.data.columns):
+            assignments_per_protein = self.data.groupby('UniProt_ID').size()
+            self.report['Assignments per Protein Mean'] = round(assignments_per_protein.mean(), 2)
+            self.report['Assignments per Protein Median'] = round(assignments_per_protein.median(), 2)
+            self.report['Assignments per Protein Range'] = round(assignments_per_protein.min(), 2), round(assignments_per_protein.max(), 2)
+            if plot_output:
+                plt.figure(figsize=(10, 6))
+                sns.histplot(assignments_per_protein, bins=50, kde=True)
+                plt.title(f'Assignments per Protein for {self.dataset_name}')
+                plt.xlabel('Number of Assignments')
+                plt.ylabel('Frequency')
+                plt.savefig(plot_output)
+            return self.report
+        else:
+            print(f"Warning: No UniProt_ID column found along with GO Term or domain columns in {self.dataset_name} for assignments per protein measurement.")
+            return None
+        
+    def measure_assignments_per_function(self, plot_output=None):
+        '''Measures the number of proteins assigned per function/domain and adds it to the report, plotting a histogram if specified.'''
+        if 'DeepGO_BP' in self.data.columns or 'DeepGO_MF' in self.data.columns or 'DeepGO_CC' in self.data.columns:
+            proteins_per_function = self.data.groupby('DeepGO_BP').size() if 'DeepGO_BP' in self.data.columns else pd.Series()
+            proteins_per_function = proteins_per_function.append(self.data.groupby('DeepGO_MF').size() if 'DeepGO_MF' in self.data.columns else pd.Series())
+            proteins_per_function = proteins_per_function.append(self.data.groupby('DeepGO_CC').size() if 'DeepGO_CC' in self.data.columns else pd.Series())
+            self.report['Proteins per Function Mean'] = round(proteins_per_function.mean(), 2)
+            self.report['Proteins per Function Median'] = round(proteins_per_function.median(), 2)
+            self.report['Proteins per Function Range'] = round(proteins_per_function.min(), 2), round(proteins_per_function.max(), 2)
+            if plot_output:
+                plt.figure(figsize=(10, 6))
+                sns.histplot(proteins_per_function, bins=50, kde=True)
+                plt.title(f'Proteins per Function for {self.dataset_name}')
+                plt.xlabel('Number of Proteins Assigned')
+                plt.ylabel('Frequency')
+                plt.savefig(plot_output)
+            return self.report
+        elif 'Pfam_domains' in self.data.columns:
+            proteins_per_domain = self.data.groupby('Pfam_domains').size()
+            self.report['Proteins per Domain Mean'] = round(proteins_per_domain.mean(), 2)
+            self.report['Proteins per Domain Median'] = round(proteins_per_domain.median(), 2)
+            self.report['Proteins per Domain Range'] = round(proteins_per_domain.min(), 2), round(proteins_per_domain.max(), 2)
+            if plot_output:
+                plt.figure(figsize=(10, 6))
+                sns.histplot(proteins_per_domain, bins=50, kde=True)
+                plt.title(f'Proteins per Domain for {self.dataset_name}')
+                plt.xlabel('Number of Proteins Assigned')
+                plt.ylabel('Frequency')
+                plt.savefig(plot_output)
+            return self.report
+        elif 'PROSITE_annotations' in self.data.columns:
+            proteins_per_prosite = self.data.groupby('PROSITE_annotations').size()
+            self.report['Proteins per PROSITE Annotation Mean'] = round(proteins_per_prosite.mean(), 2)
+            self.report['Proteins per PROSITE Annotation Median'] = round(proteins_per_prosite.median(), 2)
+            self.report['Proteins per PROSITE Annotation Range'] = round(proteins_per_prosite.min(), 2), round(proteins_per_prosite.max(), 2)
+            if plot_output:
+                plt.figure(figsize=(10, 6))
+                sns.histplot(proteins_per_prosite, bins=50, kde=True)
+                plt.title(f'Proteins per PROSITE Annotation for {self.dataset_name}')
+                plt.xlabel('Number of Proteins Assigned')
+                plt.ylabel('Frequency')
+                plt.savefig(plot_output)
+            return self.report
 
 if __name__ == "__main__":
     # Load base UniProt ID list from the protein info datasets for consistency checks
