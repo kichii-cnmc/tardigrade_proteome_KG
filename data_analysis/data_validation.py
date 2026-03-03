@@ -113,9 +113,9 @@ class DataValidator:
     def measure_relationship_score_distribution(self, plot_output=None):
         '''Measures the distribution of scores in the dataset and adds it to the report.'''
         if 'score' in self.data.columns:
-            self.report['Score Mean'] = self.data['score'].mean()
-            self.report['Score Median'] = self.data['score'].median()
-            self.report['Score Range'] = self.data['score'].min(), self.data['score'].max()
+            self.report['Score Mean'] = round(self.data['score'].mean(), 4)
+            self.report['Score Median'] = round(self.data['score'].median(), 4)
+            self.report['Score Range'] = round(self.data['score'].min(), 4), round(self.data['score'].max(), 4)
             if plot_output:
                 plt.figure(figsize=(10, 6))
                 sns.histplot(self.data['score'], bins=50, kde=True)
@@ -125,9 +125,9 @@ class DataValidator:
                 plt.savefig(plot_output)
             return self.report
         elif 'embedding_similarity' in self.data.columns:
-            self.report['Similarity Mean'] = self.data['embedding_similarity'].mean()
-            self.report['Similarity Median'] = self.data['embedding_similarity'].median()
-            self.report['Similarity Range'] = self.data['embedding_similarity'].min(), self.data['embedding_similarity'].max()
+            self.report['Similarity Mean'] = round(self.data['embedding_similarity'].mean(), 4)
+            self.report['Similarity Median'] = round(self.data['embedding_similarity'].median(), 4)
+            self.report['Similarity Range'] = round(self.data['embedding_similarity'].min(), 4), round(self.data['embedding_similarity'].max(), 4)
             if plot_output:
                 plt.figure(figsize=(10, 6))
                 sns.histplot(self.data['embedding_similarity'], bins=50, kde=True)
@@ -144,9 +144,9 @@ class DataValidator:
         '''Measures the number of relationships/interactions per source protein and adds it to the report, plotting a histogram if specified.'''
         if 'PPI_source' in self.data.columns:
             relationships_per_source = self.data.groupby('PPI_source').size()
-            self.report['Relationships per Source Mean'] = relationships_per_source.mean()
-            self.report['Relationships per Source Median'] = relationships_per_source.median()
-            self.report['Relationships per Source Range'] = relationships_per_source.min(), relationships_per_source.max()
+            self.report['Relationships per Source Mean'] = round(relationships_per_source.mean(), 2)
+            self.report['Relationships per Source Median'] = round(relationships_per_source.median(), 2)
+            self.report['Relationships per Source Range'] = round(relationships_per_source.min(), 2), round(relationships_per_source.max(), 2)
             if plot_output:
                 plt.figure(figsize=(10, 6))
                 sns.histplot(relationships_per_source, bins=50, kde=True)
@@ -157,9 +157,9 @@ class DataValidator:
             return self.report
         elif 'protein1' in self.data.columns:
             relationships_per_source = self.data.groupby('protein1').size()
-            self.report['Relationships per Source Mean'] = relationships_per_source.mean()
-            self.report['Relationships per Source Median'] = relationships_per_source.median()
-            self.report['Relationships per Source Range'] = relationships_per_source.min(), relationships_per_source.max()
+            self.report['Relationships per Source Mean'] = round(relationships_per_source.mean(), 2)
+            self.report['Relationships per Source Median'] = round(relationships_per_source.median(), 2)
+            self.report['Relationships per Source Range'] = round(relationships_per_source.min(), 2), round(relationships_per_source.max(), 2)
             if plot_output:
                 plt.figure(figsize=(10, 6))
                 sns.histplot(relationships_per_source, bins=50, kde=True)
