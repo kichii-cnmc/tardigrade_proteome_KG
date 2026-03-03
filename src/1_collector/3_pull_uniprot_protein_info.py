@@ -237,21 +237,29 @@ def _parse_gene_name(data: Dict[str, Any], info: Dict[str, Any]) -> None:
         data: UniProt JSON response data
         info: Protein information dictionary to populate
     """
-    # Try the genes array first (more detailed structure)
-    if 'genes' in data and isinstance(data['genes'], list) and len(data['genes']) > 0:
-        gene_info = data['genes'][0]
-        if 'geneName' in gene_info and 'value' in gene_info['geneName']:
-            info["Gene_Name"] = gene_info['geneName']['value']
-            return
+    gene_names = []
     
-    # Fallback to gene_names field if available
-    if 'geneNames' in data and isinstance(data['geneNames'], list) and len(data['geneNames']) > 0:
-        # Take the first gene name
-        gene_name = data['geneNames'][0]
-        if isinstance(gene_name, dict) and 'value' in gene_name:
-            info["Gene_Name"] = gene_name['value']
-        elif isinstance(gene_name, str):
-            info["Gene_Name"] = gene_name
+    # Try the genes array first (more detailed structure)
+    if 'genes' in data and isinstance(data['genes'], list):
+        for gene_info in data['genes']:  # Changed: iterate all genes
+            if 'geneName' in gene_info and 'value' in gene_info['geneName']:
+                gene_names.append(gene_info['geneName']['value'])
+            # Also get synonyms if available
+            if 'synonyms' in gene_info:
+                for synonym in gene_info['synonyms']:
+                    if 'value' in synonym:
+                        gene_names.append(synonym['value'])
+    
+    # Fallback to gene_names field if no genes found
+    if not gene_names and 'geneNames' in data and isinstance(data['geneNames'], list):
+        for gene_name in data['geneNames']:  # Changed: iterate all gene names
+            if isinstance(gene_name, dict) and 'value' in gene_name:
+                gene_names.append(gene_name['value'])
+            elif isinstance(gene_name, str):
+                gene_names.append(gene_name)
+    
+    # Join all gene names with semicolon separator
+    info["Gene_Name"] = ";".join(gene_names) if gene_names else ""
 
 def _parse_organism_name(data: Dict[str, Any], info: Dict[str, Any]) -> None:
     """
@@ -423,7 +431,6 @@ def process_proteins_batch(
         time.sleep(API_DELAY)
     
     return pd.DataFrame(results)
-
 
 def parse_input_tsv(input_tsv: str) -> Tuple[List[str], List[str]]:
     """
