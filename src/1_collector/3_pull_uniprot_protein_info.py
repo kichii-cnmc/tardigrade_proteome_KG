@@ -241,7 +241,7 @@ def _parse_gene_name(data: Dict[str, Any], info: Dict[str, Any]) -> None:
     
     # Try the genes array first (more detailed structure)
     if 'genes' in data and isinstance(data['genes'], list):
-        for gene_info in data['genes']:  # Changed: iterate all genes
+        for gene_info in data['genes']:  # iterate all genes
             if 'geneName' in gene_info and 'value' in gene_info['geneName']:
                 gene_names.append(gene_info['geneName']['value'])
             # Also get synonyms if available
@@ -252,7 +252,7 @@ def _parse_gene_name(data: Dict[str, Any], info: Dict[str, Any]) -> None:
     
     # Fallback to gene_names field if no genes found
     if not gene_names and 'geneNames' in data and isinstance(data['geneNames'], list):
-        for gene_name in data['geneNames']:  # Changed: iterate all gene names
+        for gene_name in data['geneNames']:  # iterate all gene names
             if isinstance(gene_name, dict) and 'value' in gene_name:
                 gene_names.append(gene_name['value'])
             elif isinstance(gene_name, str):
