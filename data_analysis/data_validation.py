@@ -42,6 +42,13 @@ class DataValidator:
 
     def return_name(self):
         return self.dataset_name
+    
+    def output_report(self, output_file):
+        '''Outputs the validation report as a TSV file.'''
+        report_df = pd.DataFrame(list(self.report.items()), columns=['Check', 'Result'])
+        print(f"\nValidation Report for {self.dataset_name}:\n")
+        print(report_df)
+        report_df.to_csv(output_file, sep='\t', index=False)
 
     def count_protein_sources(self):
         '''Checks the number of unique and non-unique protein sources in the dataset and adds it to the report.'''
@@ -68,11 +75,11 @@ class DataValidator:
         # ids present in dataset but not in base list
         inconsistent_ids = dataset_ids - set(self.base_id_list)
         self.report['Number of IDs Not in Base List'] = len(inconsistent_ids)
-        self.report['Percentage of IDs Not in Base List'] = (len(inconsistent_ids) / len(dataset_ids) * 100) if len(dataset_ids) > 0 else 0
+        self.report['Percentage of IDs Not in Base List'] = str((len(inconsistent_ids) / len(dataset_ids) * 100) if len(dataset_ids) > 0 else 0) + "%"
         # ids present in base list but not in dataset (coverage gap for dataset)
         missing_ids = set(self.base_id_list) - dataset_ids
         self.report['Number of IDs in Base List Not in Dataset'] = len(missing_ids)
-        self.report['Percentage of IDs in Base List Not in Dataset'] = (len(missing_ids) / len(self.base_id_list) * 100) if len(self.base_id_list) > 0 else 0
+        self.report['Percentage of IDs in Base List Not in Dataset'] = str((len(missing_ids) / len(self.base_id_list) * 100) if len(self.base_id_list) > 0 else 0) + "%"
         return inconsistent_ids, missing_ids
     
     def run_common_checks(self):
@@ -173,6 +180,12 @@ if __name__ == "__main__":
 
     # Create DataValidator instances for each dataset for each organism
     # sequence (2)
+    rv_sequence_validator = DataValidator('data/3_organized/RV_Sequence.tsv', rv_uniprot_id_list, 'RV Sequence')
+    he_sequence_validator = DataValidator('data/3_organized/HE_Sequence.tsv', he_uniprot_id_list, 'HE Sequence')
+    rv_sequence_validator.run_common_checks()
+    he_sequence_validator.run_common_checks()
+    rv_sequence_validator.output_report('data/4_analysis/RV_Sequence_validation_report.tsv')
+    he_sequence_validator.output_report('data/4_analysis/HE_Sequence_validation_report.tsv')
     # geneid (2)
     # genename (2)
     # af structures (1)
