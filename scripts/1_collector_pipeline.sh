@@ -28,9 +28,9 @@ if [ -f "$LOG_FILE" ]; then
 fi
 
 # clear 3_organized directory
-rm -rf data/3_organized/*.tsv
-echo "Cleared existing organized data files."
-echo
+# rm -rf data/3_organized/*.tsv
+# echo "Cleared existing organized data files."
+# echo
 
 # announce if test mode is enabled
 if [ "$TEST_MODE" = true ]; then
