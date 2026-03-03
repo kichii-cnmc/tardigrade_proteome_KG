@@ -1,6 +1,10 @@
 # script used to generate a validation report and figures for data in 3_organized
 
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import os
 
 '''
 Script Checks:
@@ -98,6 +102,38 @@ class DataValidator:
         else:
             print(f"Warning: No PPI_source/PPI_target or protein1/protein2 columns found in {self.dataset_name} for relationship counting.")
             return None
+        
+    def measure_relationship_score_distribution(self, plot_output=None):
+        '''Measures the distribution of scores in the dataset and adds it to the report.'''
+        if 'score' in self.data.columns:
+            self.report['Score Mean'] = self.data['score'].mean()
+            self.report['Score Median'] = self.data['score'].median()
+            self.report['Score Range'] = self.data['score'].min(), self.data['score'].max()
+            if plot_output:
+                plt.figure(figsize=(10, 6))
+                sns.histplot(self.data['score'], bins=50, kde=True)
+                plt.title(f'Score Distribution for {self.dataset_name.replace("_", " ").replace(".tsv", "")}')
+                plt.xlabel('Score')
+                plt.ylabel('Frequency')
+                plt.savefig(plot_output)
+            return self.report
+        elif 'embedding_similarity' in self.data.columns:
+            self.report['Similarity Mean'] = self.data['embedding_similarity'].mean()
+            self.report['Similarity Median'] = self.data['embedding_similarity'].median()
+            self.report['Similarity Range'] = self.data['embedding_similarity'].min(), self.data['embedding_similarity'].max()
+            if plot_output:
+                plt.figure(figsize=(10, 6))
+                sns.histplot(self.data['embedding_similarity'], bins=50, kde=True)
+                plt.title(f'Embedding Similarity Distribution for {self.dataset_name.replace("_", " ").replace(".tsv", "")}')
+                plt.xlabel('Embedding Similarity')
+                plt.ylabel('Frequency')
+                plt.savefig(plot_output)
+            return self.report
+        else:
+            print(f"Warning: No score or embedding_similarity column found in {self.dataset_name} for score distribution measurement.")
+            return None
+        
+
 
 if __name__ == "__main__":
     # Load base UniProt ID list from the protein info datasets for consistency checks
