@@ -62,6 +62,7 @@ class DataValidator:
         self.run_common_checks()
         self.measure_assignment_score_distribution(plot_output=f"data/4_analysis/{self.dataset_name}_assignment_score_distribution.png")
         self.plot_highest_assignment_targets(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_assignment_targets.png")
+        self.plot_highest_assignment_sources(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_assignment_proteins.png")
         return self.report
     
     def run_unweighted_assignment_checks(self):
@@ -297,6 +298,30 @@ class DataValidator:
             return self.report
         else:
             print(f"Warning: No Score column found in {self.dataset_name} for assignment score distribution measurement.")
+            return None
+        
+    def count_unique_assignments(self):
+        '''Counts the number of unique protein-function/domain assignments in the dataset and adds it to the report.'''
+        if 'UniProt_ID' in self.data.columns and ('DeepGO_BP' in self.data.columns or 'DeepGO_MF' in self.data.columns or 'DeepGO_CC' in self.data.columns):
+            unique_assignments = set()
+            if 'DeepGO_BP' in self.data.columns:
+                unique_assignments.update(set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['DeepGO_BP'].dropna().astype(str).tolist())))
+            if 'DeepGO_MF' in self.data.columns:
+                unique_assignments.update(set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['DeepGO_MF'].dropna().astype(str).tolist())))
+            if 'DeepGO_CC' in self.data.columns:
+                unique_assignments.update(set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['DeepGO_CC'].dropna().astype(str).tolist())))
+            self.report['Number of Unique Protein-Function Assignments'] = len(unique_assignments)
+            return len(unique_assignments)
+        elif 'UniProt_ID' in self.data.columns and 'Pfam Domain' in self.data.columns:
+            unique_assignments = set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['Pfam Domain'].dropna().astype(str).tolist()))
+            self.report['Number of Unique Protein-Domain Assignments'] = len(unique_assignments)
+            return len(unique_assignments)
+        elif 'UniProt_ID' in self.data.columns and 'PROSITE Domain' in self.data.columns:
+            unique_assignments = set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['PROSITE Domain'].dropna().astype(str).tolist()))
+            self.report['Number of Unique Protein-Domain Assignments'] = len(unique_assignments)
+            return len(unique_assignments)
+        else:
+            print(f"Warning: No UniProt_ID column found along with GO Term, Pfam Domain, or PROSITE Domain column in {self.dataset_name} for unique assignment counting.")
             return None
 
 if __name__ == "__main__":
