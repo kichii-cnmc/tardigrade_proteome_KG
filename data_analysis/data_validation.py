@@ -77,7 +77,27 @@ class DataValidator:
         self.check_id_consistency()
         return self.report
     
-    
+    def count_unique_relationships(self):
+        '''Counts the number of unique relationships/interactions in the dataset (single direction) and adds it to the report.'''
+        if 'PPI_source' in self.data.columns and 'PPI_target' in self.data.columns:
+            unique_relationships = list(zip(self.data['PPI_source'].dropna().astype(str).tolist(), self.data['PPI_target'].dropna().astype(str).tolist()))
+            set_unique_relationships = set(unique_relationships)
+            if len(unique_relationships) != len(set_unique_relationships):
+                print(f"Warning: Found {len(unique_relationships) - len(set_unique_relationships)} duplicate relationships in {self.dataset_name}.")
+                self.report['!! Number of Duplicate Relationships'] = len(unique_relationships) - len(set_unique_relationships)
+            self.report['Number of Unique Relationships'] = len(set_unique_relationships)
+            return len(set_unique_relationships)
+        elif 'protein1' in self.data.columns and 'protein2' in self.data.columns:
+            unique_relationships = list(zip(self.data['protein1'].dropna().astype(str).tolist(), self.data['protein2'].dropna().astype(str).tolist()))
+            set_unique_relationships = set(unique_relationships)
+            if len(unique_relationships) != len(set_unique_relationships):
+                print(f"Warning: Found {len(unique_relationships) - len(set_unique_relationships)} duplicate relationships in {self.dataset_name}.")
+                self.report['!! Number of Duplicate Relationships'] = len(unique_relationships) - len(set_unique_relationships)
+            self.report['Number of Unique Relationships'] = len(set_unique_relationships)
+            return len(set_unique_relationships)
+        else:
+            print(f"Warning: No PPI_source/PPI_target or protein1/protein2 columns found in {self.dataset_name} for relationship counting.")
+            return None
 
 if __name__ == "__main__":
     # Load base UniProt ID list from the protein info datasets for consistency checks
