@@ -39,6 +39,16 @@ class DataValidator:
     def return_name(self):
         return self.dataset_name
 
+    def check_unique_protein_sources(self):
+        '''Checks the number of unique protein sources in the dataset and adds it to the report.'''
+        unique_proteins = set()
+        if self.data.columns[0] == 'UniProt_ID':
+            unique_proteins = set(self.data['UniProt_ID'].dropna().astype(str).tolist())
+        elif self.data.columns[0] == 'PPI_source':
+            unique_proteins = set(self.data['PPI_source'].dropna().astype(str).tolist() + self.data['PPI_target'].dropna().astype(str).tolist())
+        self.report['num_unique_proteins'] = len(unique_proteins)
+        return len(unique_proteins)
+
 if __name__ == "__main__":
     # Load base UniProt ID list from the protein info datasets for consistency checks
     rv_uniprot_id_list = load_protein_info('data/3_organized/RV_UniProt_ID.tsv')['UniProt_ID'].tolist()
