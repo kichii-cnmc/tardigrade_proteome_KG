@@ -263,13 +263,15 @@ class DataValidator:
         available_columns = [col for col in deepgo_columns if col in self.data.columns]
         if available_columns:
             column_to_use = available_columns[0]  # Use the first one found
-            proteins_per_function = self.data.groupby(column_to_use).size()
+            proteins_per_function = self.data.groupby(column_to_use).size().sort_values(ascending=False).head(top_n)
             if plot_output:
-                plt.figure(figsize=(12, 8))
+                plt.figure(figsize=(16, 8))
                 sns.barplot(x=proteins_per_function.values, y=proteins_per_function.index)
                 plt.title(f'Top {top_n} Functions by Number of Assigned Proteins for {self.dataset_name}')
                 plt.xlabel('Number of Assigned Proteins')
                 plt.ylabel('Function (GO Term)')
+                plt.tight_layout()
+                plt.subplots_adjust(left=0.3)  # Adjust left margin to fit long GO term names
                 plt.savefig(plot_output)
                 plt.close()
             return proteins_per_function
