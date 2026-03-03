@@ -39,14 +39,17 @@ class DataValidator:
     def return_name(self):
         return self.dataset_name
 
-    def check_unique_protein_sources(self):
-        '''Checks the number of unique protein sources in the dataset and adds it to the report.'''
+    def count_protein_sources(self):
+        '''Checks the number of unique and non-unique protein sources in the dataset and adds it to the report.'''
         unique_proteins = set()
+        non_unique_proteins_count = 0
         if self.data.columns[0] == 'UniProt_ID':
             unique_proteins = set(self.data['UniProt_ID'].dropna().astype(str).tolist())
+            non_unique_proteins_count = len(self.data) - len(unique_proteins)
         elif self.data.columns[0] == 'PPI_source':
             unique_proteins = set(self.data['PPI_source'].dropna().astype(str).tolist() + self.data['PPI_target'].dropna().astype(str).tolist())
-        self.report['num_unique_proteins'] = len(unique_proteins)
+        self.report['Number of Unique Proteins'] = len(unique_proteins)
+        self.report['Number of Non-Unique or Duplicate Proteins'] = non_unique_proteins_count
         return len(unique_proteins)
 
 if __name__ == "__main__":
@@ -57,6 +60,7 @@ if __name__ == "__main__":
 
     # Create DataValidator instances for each dataset for each organism
     # sequence (2)
+
     # geneid (2)
     # af structures (1)
     # deepgo (BP, MF, CC) (1)
