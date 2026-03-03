@@ -130,6 +130,15 @@ class IGraphBuilder:
         for alias_value, node_name in alias_list:
             self.ALIAS_MAPPER.add_alias(alias_value, node_name)
 
+    def build_go_term_alias_mapping(self, node_names_list):
+        '''Build mapping of GO term IDs to their names for better interpretability in the graph.'''
+        alias_list = []
+        for name in node_names_list:
+            if name.startswith("GO:"):
+                go_id = name[:10]
+                alias_list.append((go_id, name))
+        return alias_list
+
     def add_to_graph_tsv(self, tsv_file_path):
         '''Add nodes and edges from a TSV file, determines the correct format based on the 2nd column name.'''
         if not os.path.exists(tsv_file_path):
@@ -142,6 +151,7 @@ class IGraphBuilder:
         second_col = df.columns[1]
         # Handle pandas automatic column renaming for duplicates (e.g., 'UniProt_ID.1')
         second_col_clean = second_col.split('.')[0] if '.' in second_col else second_col
+        # if second column matches an edge label, add edges
         if second_col_clean in self.GRAPH_EDGE_LABELS:
             edge_label, weight_col = self.GRAPH_EDGE_LABELS[second_col]
             edges_list = []
@@ -151,16 +161,22 @@ class IGraphBuilder:
                 weight = round(row.iloc[2], 4) if weight_col is None else 1
                 edges_list.append((source, target, weight))
             print(f"Adding edges of type '{edge_label}' from {tsv_file_path}...")
-            # add nodes first to ensure all vertices exist before adding edges, then add edges in bulk
+            # check column name for node type mapping, default to 'UnknownType' if not found
             node_type = self.GRAPH_NODE_LABELS.get(second_col_clean, "UnknownType")
             if node_type == "UnknownType":
                 print(f"    Warning: No node type mapping found for column '{second_col_clean}', defaulting to 'UnknownType'.")
             self.add_nodes_from_list([target for _, target, _ in edges_list], node_type=node_type)
+            if node_type in ["Molecular_Function", "Cellular_Component", "Biological_Process"]:
+                # inputs a non-tuple list of the GO terms added to the graph as nodes to build the alias mapping for better interpretability
+                alias_list = self.build_go_term_alias_mapping(list(set(target for _, target, _ in edges_list)))
+                self.add_alias_attributes_from_list(alias_list)
             self.add_edges_from_list(edges_list, edge_type=edge_label)
+        # if second column matches a node label, add nodes
         elif second_col_clean in self.GRAPH_NODE_LABELS:
             node_type = self.GRAPH_NODE_LABELS[second_col_clean]
             print(f"Adding nodes of type '{node_type}' from {tsv_file_path}...")
             self.add_nodes_from_list(df.iloc[:, 1].tolist(), node_type=node_type)
+        # if second column matches an alias type, add to alias mapping
         elif second_col_clean in self.GRAPH_NODE_ALIAS_TYPES:
             print(f"Adding alias attributes from {tsv_file_path}...")
             alias_list = list(zip(df.iloc[:, 1].tolist(), df.iloc[:, 0].tolist())) # swap to (alias_value, node_name) format
@@ -409,7 +425,7 @@ if __name__ == "__main__":
     graph_builder.filter_nodes_by_degree(min_degree=1)  # Example threshold, adjust as needed
     graph_builder.evaluate_graph()
     print()
-    node_relations = graph_builder.get_node_relations("GAV06484.1")  # Example node name, adjust as needed
+    node_relations = graph_builder.get_node_relations("GO:0016773")  # Example node name, adjust as needed
     for relation in node_relations:
         print(relation)
     print()
