@@ -57,6 +57,13 @@ class DataValidator:
         self.plot_highest_relationship_sources(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_relationship_sources.png")
         return self.report
 
+    def run_assignment_checks(self):
+        '''Runs checks specific to assignment-type datasets and returns the report.'''
+        self.run_common_checks()
+        self.plot_highest_assignment_sources(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_assignment_proteins.png")
+        self.plot_highest_assignment_targets(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_assignment_targets.png")
+        return self.report
+
     def output_report(self, output_file):
         '''Outputs the validation report as a TSV file.'''
         report_df = pd.DataFrame(list(self.report.items()), columns=['Check', 'Result'])
