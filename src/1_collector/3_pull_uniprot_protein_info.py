@@ -8,6 +8,8 @@ This script fetches protein information from the UniProt API including:
 - PROSITE annotations
 - PDB/AlphaFold structure IDs
 - Gene sequences
+- Gene Name
+- Organism Name
 
 Supports batch processing only.
 """
@@ -22,7 +24,7 @@ import pandas as pd
 # Constants
 UNIPROT_BASE_URL = "https://rest.uniprot.org/uniprotkb"
 UNIPROT_SEARCH_URL = f"{UNIPROT_BASE_URL}/search"
-UNIPROT_FIELDS = "accession,sequence,go_p,go_c,go_f,go_id,xref_pfam,xref_kegg,xref_prosite,xref_alphafolddb,xref_pdb,xref_geneid"
+UNIPROT_FIELDS = "accession,sequence,go_p,go_c,go_f,go_id,xref_pfam,xref_kegg,xref_prosite,xref_alphafolddb,xref_pdb,xref_geneid,gene_names,organism_name"
 
 # Processing parameters
 DEFAULT_MAX_CONCURRENT = 10
@@ -38,7 +40,7 @@ MAX_RETRIES = 3
 OUTPUT_HEADERS = [
     "UniProt_ID", "NCBI_ID", "Sequence", "GeneID", "GO_mf", "GO_cc", "GO_bp",
     "Pfam_domains", "KEGG_pathways", "PROSITE_annotations", 
-    "PDB_structures", "AF_structures"
+    "PDB_structures", "AF_structures", "Gene_Name", "Organism_Name"
 ]
 
 def fetch_uniprot_batch(uniprot_ids_batch: List[str]) -> Dict[str, Dict[str, Any]]:
@@ -115,7 +117,9 @@ def create_empty_protein_info() -> Dict[str, Any]:
         "PROSITE_annotations": set(),
         "PDB_structures": set(),
         "AF_structures": set(),  # AlphaFold structures
-        "Sequence": ""
+        "Sequence": "",
+        "Gene_Name": "",
+        "Organism_Name": ""
     }
 
 
@@ -135,6 +139,8 @@ def parse_uniprot_data(data: Dict[str, Any], primary_id: str) -> Dict[str, Any]:
     # Extract cross-references and sequence
     _parse_cross_references(data, info)
     _parse_sequence(data, info)
+    _parse_gene_name(data, info)
+    _parse_organism_name(data, info)
     
     # Convert sets to lists (except Sequence which remains a string)
     for key, value in info.items():
@@ -223,6 +229,47 @@ def _parse_sequence(data: Dict[str, Any], info: Dict[str, Any]) -> None:
     if 'sequence' in data and 'value' in data['sequence']:
         info["Sequence"] = data['sequence']['value']
 
+def _parse_gene_name(data: Dict[str, Any], info: Dict[str, Any]) -> None:
+    """
+    Parse gene name from UniProt data.
+    
+    Args:
+        data: UniProt JSON response data
+        info: Protein information dictionary to populate
+    """
+    # Try the genes array first (more detailed structure)
+    if 'genes' in data and isinstance(data['genes'], list) and len(data['genes']) > 0:
+        gene_info = data['genes'][0]
+        if 'geneName' in gene_info and 'value' in gene_info['geneName']:
+            info["Gene_Name"] = gene_info['geneName']['value']
+            return
+    
+    # Fallback to gene_names field if available
+    if 'geneNames' in data and isinstance(data['geneNames'], list) and len(data['geneNames']) > 0:
+        # Take the first gene name
+        gene_name = data['geneNames'][0]
+        if isinstance(gene_name, dict) and 'value' in gene_name:
+            info["Gene_Name"] = gene_name['value']
+        elif isinstance(gene_name, str):
+            info["Gene_Name"] = gene_name
+
+def _parse_organism_name(data: Dict[str, Any], info: Dict[str, Any]) -> None:
+    """
+    Parse organism name from UniProt data.
+    
+    Args:
+        data: UniProt JSON response data
+        info: Protein information dictionary to populate
+    """
+    # Try organism.scientificName first
+    if 'organism' in data and 'scientificName' in data['organism']:
+        info["Organism_Name"] = data['organism']['scientificName']
+        return
+    
+    # Fallback to direct organism_name field if available
+    if 'organism_name' in data:
+        info["Organism_Name"] = data['organism_name']
+
 def fetch_uniprot_info(uniprot_id: str) -> Optional[Dict[str, Any]]:
     """
     Synchronous fallback function for fetching protein information.
@@ -280,7 +327,9 @@ def format_protein_row_dict(uniprot_id: str, ncbi_id: str, info: Optional[Dict[s
             "KEGG_pathways": "",
             "PROSITE_annotations": "",
             "PDB_structures": "",
-            "AF_structures": ""
+            "AF_structures": "",
+            "Gene_Name": "",
+            "Organism_Name": ""
         }
     
     return {
@@ -295,7 +344,9 @@ def format_protein_row_dict(uniprot_id: str, ncbi_id: str, info: Optional[Dict[s
         "KEGG_pathways": ";".join(info.get("KEGG_pathways", [])),
         "PROSITE_annotations": ";".join(info.get("PROSITE_annotations", [])),
         "PDB_structures": ";".join(info.get("PDB_structures", [])[:MAX_PDB_STRUCTURES]),
-        "AF_structures": ";".join(info.get("AF_structures", []))
+        "AF_structures": ";".join(info.get("AF_structures", [])),
+        "Gene_Name": info.get("Gene_Name", ""),
+        "Organism_Name": info.get("Organism_Name", "")
     }
 
 
@@ -420,7 +471,7 @@ def main() -> None:
     uniprot_ids, ncbi_ids = parse_input_tsv(args.input_tsv)
     
     if args.test_mode:
-        test_size = min(60, len(uniprot_ids))
+        test_size = min(100, len(uniprot_ids))
         uniprot_ids = uniprot_ids[:test_size]
         ncbi_ids = ncbi_ids[:test_size]
         print(f"Test mode enabled: processing only {test_size} proteins.")
