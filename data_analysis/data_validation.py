@@ -180,6 +180,32 @@ class DataValidator:
             print(f"Warning: No PPI_source or protein1 column found in {self.dataset_name} for relationships per source measurement.")
             return None
 
+    def plot_highest_relationship_sources(self, top_n=20, plot_output=None):
+        '''Identifies the source proteins with the most relationships/interactions and outputs a plot.'''
+        if 'PPI_source' in self.data.columns:
+            relationships_per_source = self.data.groupby('PPI_source').size().sort_values(ascending=False).head(top_n)
+            if plot_output:
+                plt.figure(figsize=(12, 8))
+                sns.barplot(x=relationships_per_source.values, y=relationships_per_source.index)
+                plt.title(f'Top {top_n} Source Proteins by Number of Relationships for {self.dataset_name}')
+                plt.xlabel('Number of Relationships')
+                plt.ylabel('Source Protein')
+                plt.savefig(plot_output)
+            return relationships_per_source
+        elif 'protein1' in self.data.columns:
+            relationships_per_source = self.data.groupby('protein1').size().sort_values(ascending=False).head(top_n)
+            if plot_output:
+                plt.figure(figsize=(12, 8))
+                sns.barplot(x=relationships_per_source.values, y=relationships_per_source.index)
+                plt.title(f'Top {top_n} Source Proteins by Number of Relationships for {self.dataset_name}')
+                plt.xlabel('Number of Relationships')
+                plt.ylabel('Source Protein')
+                plt.savefig(plot_output)
+            return relationships_per_source
+        else:
+            print(f"Warning: No PPI_source or protein1 column found in {self.dataset_name} for highest relationship sources measurement.")
+            return None
+        
 if __name__ == "__main__":
     # Load base UniProt ID list from the protein info datasets for consistency checks
     rv_uniprot_id_list = load_protein_info('data/3_organized/RV_UniProt_ID.tsv')['UniProt_ID'].tolist()
