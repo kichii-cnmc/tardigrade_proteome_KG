@@ -112,7 +112,7 @@ class DataValidator:
             if plot_output:
                 plt.figure(figsize=(10, 6))
                 sns.histplot(self.data['score'], bins=50, kde=True)
-                plt.title(f'Score Distribution for {self.dataset_name.replace("_", " ").replace(".tsv", "")}')
+                plt.title(f'Score Distribution for {self.dataset_name}')
                 plt.xlabel('Score')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
@@ -124,7 +124,7 @@ class DataValidator:
             if plot_output:
                 plt.figure(figsize=(10, 6))
                 sns.histplot(self.data['embedding_similarity'], bins=50, kde=True)
-                plt.title(f'Embedding Similarity Distribution for {self.dataset_name.replace("_", " ").replace(".tsv", "")}')
+                plt.title(f'Embedding Similarity Distribution for {self.dataset_name}')
                 plt.xlabel('Embedding Similarity')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
@@ -143,7 +143,7 @@ class DataValidator:
             if plot_output:
                 plt.figure(figsize=(10, 6))
                 sns.histplot(relationships_per_source, bins=50, kde=True)
-                plt.title(f'Relationships per Source Protein for {self.dataset_name.replace("_", " ").replace(".tsv", "")}')
+                plt.title(f'Relationships per Source Protein for {self.dataset_name}')
                 plt.xlabel('Number of Relationships')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
@@ -156,7 +156,7 @@ class DataValidator:
             if plot_output:
                 plt.figure(figsize=(10, 6))
                 sns.histplot(relationships_per_source, bins=50, kde=True)
-                plt.title(f'Relationships per Source Protein for {self.dataset_name.replace("_", " ").replace(".tsv", "")}')
+                plt.title(f'Relationships per Source Protein for {self.dataset_name}')
                 plt.xlabel('Number of Relationships')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
