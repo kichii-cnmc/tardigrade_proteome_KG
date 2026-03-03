@@ -198,7 +198,7 @@ class IGraphBuilder:
     def get_graph(self):
         return self.graph
     
-    def _sample_representative_subgraph(self, k=6, max_edges=600):
+    def sample_representative_subgraph(self, k=6, max_edges=600):
         '''Return a representative subgraph of the top-k highest-degree nodes per node_type.
         Node selection is based on inter-type degree (edges to nodes of a different type)
         so the chosen nodes are structurally meaningful across the KG.
@@ -262,7 +262,7 @@ class IGraphBuilder:
             sub.add_edges(new_edges, attributes={'edge_type': etypes, 'weight': weights})
         return sub
 
-    def visualize_graph(self, output_path, sample_k=8):
+    def visualize_graph(self, g, output_path):
         NODE_TYPE_COLORS = {
             'Protein':               '#4C72B0',
             'Molecular_Function':    '#DD8452',
@@ -284,8 +284,6 @@ class IGraphBuilder:
             'embeddings_similar_to': "#2D00E1",
             None: '#CCCCCC',
         }
-
-        g = self._sample_representative_subgraph(k=sample_k)
 
         vertex_colors = [NODE_TYPE_COLORS.get(v['node_type'], '#CCCCCC') for v in g.vs]
         degrees = g.degree()
@@ -325,6 +323,16 @@ class IGraphBuilder:
         legend_path = output_path.rsplit('.', 1)[0] + '_legend.png'
         fig.savefig(legend_path, bbox_inches='tight', dpi=150)
         plt.close(fig)
+
+    def sample_node_subgraph(self, node_name):
+        node_id = self.identify_node(node_name)
+        if node_id is None:
+            print(f"Cannot visualize graph for '{node_name}' because the node does not exist.")
+            return
+
+        neighbors = self.graph.neighbors(node_id, mode="all")
+        subgraph = self.graph.subgraph([node_id] + neighbors)
+        return subgraph
 
     def output_triples(self, output_path):
         with open(output_path, 'w') as f:
@@ -394,7 +402,7 @@ if __name__ == "__main__":
     for file in files_in_folder:
         print(f"Processing file: {file}")
         graph_builder.add_to_graph_tsv(file)
-    graph_builder.filter_edges_by_weight(min_weight=0.5)  # Example threshold, adjust as needed
+    graph_builder.filter_edges_by_weight(min_weight=0.6)  # Example threshold, adjust as needed
     graph_builder.filter_nodes_by_degree(min_degree=1)  # Example threshold, adjust as needed
     graph_builder.evaluate_graph()
     print()
@@ -402,6 +410,7 @@ if __name__ == "__main__":
     for relation in node_relations:
         print(relation)
     print()
-    graph_builder.visualize_graph("graph_visualization.png", sample_k = 4)
+    graph_builder.visualize_graph(graph_builder.sample_representative_subgraph(k = 4), "graph_visualization.png")
+    graph_builder.visualize_graph(graph_builder.sample_node_subgraph("GAV06484.1"), "GAV06484.1_subgraph.png")
     graph_builder.output_triples("graph_triples.tsv")
     graph_builder.output_nodes("graph_nodes.tsv")
