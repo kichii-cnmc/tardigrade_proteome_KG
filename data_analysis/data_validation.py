@@ -57,8 +57,15 @@ class DataValidator:
         self.plot_highest_relationship_sources(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_relationship_sources.png")
         return self.report
 
-    def run_assignment_checks(self):
-        '''Runs checks specific to assignment-type datasets and returns the report.'''
+    def run_weighted_assignment_checks(self):
+        '''Runs checks specific to weighted assignment-type datasets and returns the report.'''
+        self.run_common_checks()
+        self.measure_assignment_score_distribution(plot_output=f"data/4_analysis/{self.dataset_name}_assignment_score_distribution.png")
+        self.plot_highest_assignment_targets(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_assignment_targets.png")
+        return self.report
+    
+    def run_unweighted_assignment_checks(self):
+        '''Runs checks specific to unweighted assignment-type datasets and returns the report.'''
         self.run_common_checks()
         self.plot_highest_assignment_sources(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_assignment_proteins.png")
         self.plot_highest_assignment_targets(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_assignment_targets.png")
