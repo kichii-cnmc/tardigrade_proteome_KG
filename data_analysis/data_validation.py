@@ -60,7 +60,10 @@ class DataValidator:
     def run_weighted_assignment_checks(self):
         '''Runs checks specific to weighted assignment-type datasets and returns the report.'''
         self.run_common_checks()
+        self.count_unique_assignments()
         self.measure_assignment_score_distribution(plot_output=f"data/4_analysis/{self.dataset_name}_assignment_score_distribution.png")
+        self.measure_assignments_per_protein(plot_output=f"data/4_analysis/{self.dataset_name}_assignments_per_protein.png")
+        self.measure_assignments_per_function(plot_output=f"data/4_analysis/{self.dataset_name}_assignments_per_function.png")  
         self.plot_highest_assignment_targets(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_assignment_targets.png")
         self.plot_highest_assignment_sources(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_assignment_proteins.png")
         return self.report
@@ -68,6 +71,9 @@ class DataValidator:
     def run_unweighted_assignment_checks(self):
         '''Runs checks specific to unweighted assignment-type datasets and returns the report.'''
         self.run_common_checks()
+        self.count_unique_assignments()
+        self.measure_assignments_per_protein(plot_output=f"data/4_analysis/{self.dataset_name}_assignments_per_protein.png")
+        self.measure_assignments_per_function(plot_output=f"data/4_analysis/{self.dataset_name}_assignments_per_function.png")
         self.plot_highest_assignment_sources(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_assignment_proteins.png")
         self.plot_highest_assignment_targets(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_assignment_targets.png")
         return self.report
@@ -436,6 +442,15 @@ if __name__ == "__main__":
     rv_af_validator.output_report('data/4_analysis/RV_AF_structures_validation_report.tsv')
     he_af_validator.output_report('data/4_analysis/HE_AF_structures_validation_report.tsv')
     # deepgo (BP, MF, CC) (1)
+    merged_deepgo_bp_validator = DataValidator('data/3_organized/DeepGO_BP.tsv', merged_uniprot_id_list, 'Merged DeepGO BP Predictions')
+    merged_deepgo_mf_validator = DataValidator('data/3_organized/DeepGO_MF.tsv', merged_uniprot_id_list, 'Merged DeepGO MF Predictions')
+    merged_deepgo_cc_validator = DataValidator('data/3_organized/DeepGO_CC.tsv', merged_uniprot_id_list, 'Merged DeepGO CC Predictions')
+    merged_deepgo_bp_validator.run_weighted_assignment_checks()
+    merged_deepgo_mf_validator.run_weighted_assignment_checks()
+    merged_deepgo_cc_validator.run_weighted_assignment_checks()
+    merged_deepgo_bp_validator.output_report('data/4_analysis/Merged_DeepGO_BP_validation_report.tsv')
+    merged_deepgo_mf_validator.output_report('data/4_analysis/Merged_DeepGO_MF_validation_report.tsv')
+    merged_deepgo_cc_validator.output_report('data/4_analysis/Merged_DeepGO_CC_validation_report.tsv')
     # pfam (2)
     # prosite (2)
     # string ppi (2)
