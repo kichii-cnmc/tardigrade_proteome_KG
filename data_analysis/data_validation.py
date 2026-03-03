@@ -42,6 +42,21 @@ class DataValidator:
     def return_name(self):
         return self.dataset_name
     
+    def run_common_checks(self):
+        '''Runs all common or universal checks and returns the report.'''
+        self.count_protein_sources()
+        self.check_id_consistency()
+        return self.report
+    
+    def run_relationship_checks(self):
+        '''Runs checks specific to relationship-type datasets and returns the report.'''
+        self.run_common_checks()
+        self.count_unique_relationships()
+        self.measure_relationship_score_distribution(plot_output=f"data/4_analysis/{self.dataset_name}_score_distribution.png")
+        self.measure_relationships_per_source(plot_output=f"data/4_analysis/{self.dataset_name}_relationships_per_source.png")
+        self.plot_highest_relationship_sources(top_n=20, plot_output=f"data/4_analysis/{self.dataset_name}_top_relationship_sources.png")
+        return self.report
+
     def output_report(self, output_file):
         '''Outputs the validation report as a TSV file.'''
         report_df = pd.DataFrame(list(self.report.items()), columns=['Check', 'Result'])
@@ -81,20 +96,6 @@ class DataValidator:
         self.report['Number of IDs in Base List Not in Dataset'] = len(missing_ids)
         self.report['Percentage of IDs in Base List Not in Dataset'] = str((len(missing_ids) / len(self.base_id_list) * 100) if len(self.base_id_list) > 0 else 0) + "%"
         return inconsistent_ids, missing_ids
-    
-    def run_common_checks(self):
-        '''Runs all common or universal checks and returns the report.'''
-        self.count_protein_sources()
-        self.check_id_consistency()
-        return self.report
-    
-    def run_relationship_checks(self):
-        '''Runs checks specific to relationship-type datasets and returns the report.'''
-        self.run_common_checks()
-        self.count_unique_relationships()
-        self.measure_relationship_score_distribution(plot_output=f"data/4_analysis/{self.dataset_name}_score_distribution.png")
-        self.measure_relationships_per_source(plot_output=f"data/4_analysis/{self.dataset_name}_relationships_per_source.png")
-        return self.report
 
     def count_unique_relationships(self):
         '''Counts the number of unique relationships/interactions in the dataset (single direction) and adds it to the report.'''
