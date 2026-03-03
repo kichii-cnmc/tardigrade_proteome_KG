@@ -159,6 +159,7 @@ class DataValidator:
                 plt.xlabel('Score')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
+                plt.close()
             return self.report
         elif 'embedding_similarity' in self.data.columns:
             self.report['Similarity Mean'] = round(self.data['embedding_similarity'].mean(), 4)
@@ -171,6 +172,7 @@ class DataValidator:
                 plt.xlabel('Embedding Similarity')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
+                plt.close()
             return self.report
         else:
             print(f"Warning: No score or embedding_similarity column found in {self.dataset_name} for score distribution measurement.")
@@ -190,6 +192,7 @@ class DataValidator:
                 plt.xlabel('Number of Relationships')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
+                plt.close()
             return self.report
         elif 'protein1' in self.data.columns:
             relationships_per_source = self.data.groupby('protein1').size()
@@ -203,6 +206,7 @@ class DataValidator:
                 plt.xlabel('Number of Relationships')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
+                plt.close()
             return self.report
         else:
             print(f"Warning: No PPI_source or protein1 column found in {self.dataset_name} for relationships per source measurement.")
@@ -219,6 +223,7 @@ class DataValidator:
                 plt.xlabel('Number of Relationships')
                 plt.ylabel('Source Protein')
                 plt.savefig(plot_output)
+                plt.close()
             return relationships_per_source
         elif 'protein1' in self.data.columns:
             relationships_per_source = self.data.groupby('protein1').size().sort_values(ascending=False).head(top_n)
@@ -229,6 +234,7 @@ class DataValidator:
                 plt.xlabel('Number of Relationships')
                 plt.ylabel('Source Protein')
                 plt.savefig(plot_output)
+                plt.close()
             return relationships_per_source
         else:
             print(f"Warning: No PPI_source or protein1 column found in {self.dataset_name} for highest relationship sources measurement.")
@@ -245,6 +251,7 @@ class DataValidator:
                 plt.xlabel('Number of Assignments')
                 plt.ylabel('Protein (UniProt ID)')
                 plt.savefig(plot_output)
+                plt.close()
             return assignments_per_protein
         else:
             print(f"Warning: No UniProt_ID column found in {self.dataset_name} for highest assignment sources measurement.")
@@ -264,6 +271,7 @@ class DataValidator:
                 plt.xlabel('Number of Assigned Proteins')
                 plt.ylabel('Function (GO Term)')
                 plt.savefig(plot_output)
+                plt.close()
             return proteins_per_function
         elif 'Pfam Domain' in self.data.columns:
             proteins_per_domain = self.data.groupby('Pfam Domain').size().sort_values(ascending=False).head(top_n)
@@ -274,6 +282,7 @@ class DataValidator:
                 plt.xlabel('Number of Assigned Proteins')
                 plt.ylabel('Domain (Pfam)')
                 plt.savefig(plot_output)
+                plt.close()
             return proteins_per_domain
         elif 'PROSITE Domain' in self.data.columns:
             proteins_per_domain = self.data.groupby('PROSITE Domain').size().sort_values(ascending=False).head(top_n)
@@ -284,6 +293,7 @@ class DataValidator:
                 plt.xlabel('Number of Assigned Proteins')
                 plt.ylabel('Domain (PROSITE)')
                 plt.savefig(plot_output)
+                plt.close()
             return proteins_per_domain
         else:
             print(f"Warning: No GO Term, Pfam Domain, or PROSITE Domain column found in {self.dataset_name} for highest assignment targets measurement.")
@@ -302,6 +312,7 @@ class DataValidator:
                 plt.xlabel('Assignment Score')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
+                plt.close()
             return self.report
         else:
             print(f"Warning: No Score column found in {self.dataset_name} for assignment score distribution measurement.")
@@ -345,6 +356,7 @@ class DataValidator:
                 plt.xlabel('Number of Assignments')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
+                plt.close()
             return self.report
         elif 'UniProt_ID' in self.data.columns and ('Pfam_domain' in self.data.columns or 'PROSITE_annotations' in self.data.columns):
             assignments_per_protein = self.data.groupby('UniProt_ID').size()
@@ -358,6 +370,7 @@ class DataValidator:
                 plt.xlabel('Number of Assignments')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
+                plt.close()
             return self.report
         else:
             print(f"Warning: No UniProt_ID column found along with GO Term or domain columns in {self.dataset_name} for assignments per protein measurement.")
@@ -380,6 +393,7 @@ class DataValidator:
                 plt.xlabel('Number of Proteins Assigned')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
+                plt.close()
             return self.report
         elif 'Pfam_domains' in self.data.columns:
             proteins_per_domain = self.data.groupby('Pfam_domains').size()
@@ -393,6 +407,7 @@ class DataValidator:
                 plt.xlabel('Number of Proteins Assigned')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
+                plt.close()
             return self.report
         elif 'PROSITE_annotations' in self.data.columns:
             proteins_per_prosite = self.data.groupby('PROSITE_annotations').size()
@@ -406,6 +421,7 @@ class DataValidator:
                 plt.xlabel('Number of Proteins Assigned')
                 plt.ylabel('Frequency')
                 plt.savefig(plot_output)
+                plt.close()
             return self.report
 
 if __name__ == "__main__":
