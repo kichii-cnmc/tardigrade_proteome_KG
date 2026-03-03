@@ -70,8 +70,8 @@ if [ "$TEST_MODE" = true ]; then
 fi
 
 # run the protein info pull script on each file
-python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_RV.tsv data/3_organized/RV.tsv --method batch
-python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_HE.tsv data/3_organized/HE.tsv --method batch
+python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_RV.tsv data/3_organized/RV.tsv
+python3 src/1_collector/3_pull_uniprot_protein_info.py data/2_merged/merged_HE.tsv data/3_organized/HE.tsv
 
 # collect STRING PPI data
 # delete existing string PPI files

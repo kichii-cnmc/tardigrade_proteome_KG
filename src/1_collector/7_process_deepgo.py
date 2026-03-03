@@ -29,6 +29,10 @@ def process_deepgo_annotations(input_file, output_file, upid_folder=None):
     if not all(col in df.columns for col in expected_columns):
         raise ValueError(f"Input file must contain the following columns: {expected_columns}")
     
+    # filter out any duplicate rows (same SwissProt ID, Function Type, GO Term) and keep the one with the highest score
+    df = df.sort_values('Score', ascending=False).drop_duplicates(subset=['SwissProt ID', 'Function Type', 'GO Term'], keep='first')
+
+    # if upid_folder is provided, find all TSV files with UniProt IDs and filter the DeepGO annotations to keep only those with SwissProt IDs that match the valid UniProt IDs from the files
     if upid_folder:
         upid_files = find_uniprot_tsvs(upid_folder)
         if upid_files:
@@ -40,7 +44,7 @@ def process_deepgo_annotations(input_file, output_file, upid_folder=None):
                 if len(upid_df.columns) > 1 and upid_df.columns[1].startswith('UniProt_ID'):
                     valid_uniprot_ids.update(upid_df.iloc[:, 1].dropna().astype(str).tolist())
             print(f"Total unique valid UniProt IDs collected: {len(valid_uniprot_ids)}")
-            # filter the PPI DataFrame to keep only rows where the SwissProt ID is in the valid UniProt ID set
+            # filter the DeepGO DataFrame to keep only rows where the SwissProt ID is in the valid UniProt ID set
             df = df[df['SwissProt ID'].isin(valid_uniprot_ids)]
             print(f"DeepGO data filtered to {len(df)} annotations after applying UniProt ID filtering.")
         else:

@@ -173,6 +173,20 @@ def query_deepgoplus(id_sequence_set, output_file="deepgoplus_predictions.tsv", 
         # Small delay between batches to be nice to the API
         time.sleep(2)
 
+def normalize_scores(file_path):
+    '''Normalizes the scores in a TSV file to be between 0 and 1 by dividing by the maximum score.'''
+    df = pd.read_csv(file_path, sep='\t')
+    if len(df.columns) > 3 and df.columns[3] == 'Score':
+        max_score = df['Score'].max()
+        if max_score > 0:
+            df['Score'] = df['Score'] / max_score
+            df.to_csv(file_path, sep='\t', index=False)
+            print(f"Scores normalized in {file_path}")
+        else:
+            print(f"No valid scores to normalize in {file_path}")
+    else:
+        print(f"'Score' column not found in {file_path}")
+
 def test_api_endpoint():
     '''Test the API endpoint to see what it expects'''
     try:
@@ -224,5 +238,6 @@ if __name__ == "__main__":
     start_time = time.time()
     query_deepgoplus(all_id_sequence_set, output_file=args.output_file, version_number=args.version_number)
     end_time = time.time()
+    normalize_scores(args.output_file)
     print(f"GO term prediction of {len(all_id_sequence_set)} sequences completed in {end_time - start_time:.2f} seconds. Results saved to {args.output_file}.")
 

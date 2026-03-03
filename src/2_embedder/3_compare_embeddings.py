@@ -107,6 +107,11 @@ if __name__ == "__main__":
     # Fast sort by similarity in descending order using numpy argsort
     sort_indices = np.argsort(-similarity_matrix[indices])
     edge_list_df = edge_list_df.iloc[sort_indices]
+
+    # divide similarity by max similarity to normalize between 0 and 1
+    max_similarity = edge_list_df['embedding_similarity'].max()
+    if max_similarity > 0:
+        edge_list_df['embedding_similarity'] = edge_list_df['embedding_similarity'] / max_similarity
     
     edge_list_df.to_csv(output_list_path, sep='\t', index=False, float_format='%.4f')
     time_end = time()
