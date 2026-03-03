@@ -213,6 +213,60 @@ class DataValidator:
             print(f"Warning: No PPI_source or protein1 column found in {self.dataset_name} for highest relationship sources measurement.")
             return None
         
+    def plot_highest_assignment_sources(self, top_n=20, plot_output=None):
+        '''Identifies the source proteins with the most function/domain assignments and outputs a plot.'''
+        if 'UniProt_ID' in self.data.columns:
+            assignments_per_protein = self.data.groupby('UniProt_ID').size().sort_values(ascending=False).head(top_n)
+            if plot_output:
+                plt.figure(figsize=(12, 8))
+                sns.barplot(x=assignments_per_protein.values, y=assignments_per_protein.index)
+                plt.title(f'Top {top_n} Proteins by Number of Assignments for {self.dataset_name}')
+                plt.xlabel('Number of Assignments')
+                plt.ylabel('Protein (UniProt ID)')
+                plt.savefig(plot_output)
+            return assignments_per_protein
+        else:
+            print(f"Warning: No UniProt_ID column found in {self.dataset_name} for highest assignment sources measurement.")
+            return None
+        
+    def plot_highest_assignment_targets(self, top_n=20, plot_output=None):
+        '''Identifies the most common function/domain targets of assignments and outputs a plot.'''
+        if 'DeepGO_BP' in self.data.columns or 'DeepGO_MF' in self.data.columns or 'DeepGO_CC' in self.data.columns:
+            proteins_per_function = self.data.groupby('DeepGO_BP').size().sort_values(ascending=False).head(top_n) if 'DeepGO_BP' in self.data.columns else pd.Series()
+            proteins_per_function = proteins_per_function.append(self.data.groupby('DeepGO_MF').size().sort_values(ascending=False).head(top_n) if 'DeepGO_MF' in self.data.columns else pd.Series())
+            proteins_per_function = proteins_per_function.append(self.data.groupby('DeepGO_CC').size().sort_values(ascending=False).head(top_n) if 'DeepGO_CC' in self.data.columns else pd.Series())
+            if plot_output:
+                plt.figure(figsize=(12, 8))
+                sns.barplot(x=proteins_per_function.values, y=proteins_per_function.index)
+                plt.title(f'Top {top_n} Functions by Number of Assigned Proteins for {self.dataset_name}')
+                plt.xlabel('Number of Assigned Proteins')
+                plt.ylabel('Function (GO Term)')
+                plt.savefig(plot_output)
+            return proteins_per_function
+        elif 'Pfam Domain' in self.data.columns:
+            proteins_per_domain = self.data.groupby('Pfam Domain').size().sort_values(ascending=False).head(top_n)
+            if plot_output:
+                plt.figure(figsize=(12, 8))
+                sns.barplot(x=proteins_per_domain.values, y=proteins_per_domain.index)
+                plt.title(f'Top {top_n} Domains by Number of Assigned Proteins for {self.dataset_name}')
+                plt.xlabel('Number of Assigned Proteins')
+                plt.ylabel('Domain (Pfam)')
+                plt.savefig(plot_output)
+            return proteins_per_domain
+        elif 'PROSITE Domain' in self.data.columns:
+            proteins_per_domain = self.data.groupby('PROSITE Domain').size().sort_values(ascending=False).head(top_n)
+            if plot_output:
+                plt.figure(figsize=(12, 8))
+                sns.barplot(x=proteins_per_domain.values, y=proteins_per_domain.index)
+                plt.title(f'Top {top_n} Domains by Number of Assigned Proteins for {self.dataset_name}')
+                plt.xlabel('Number of Assigned Proteins')
+                plt.ylabel('Domain (PROSITE)')
+                plt.savefig(plot_output)
+            return proteins_per_domain
+        else:
+            print(f"Warning: No GO Term, Pfam Domain, or PROSITE Domain column found in {self.dataset_name} for highest assignment targets measurement.")
+            return None
+
 if __name__ == "__main__":
     # Load base UniProt ID list from the protein info datasets for consistency checks
     rv_uniprot_id_list = load_protein_info('data/3_organized/RV_UniProt_ID.tsv')['UniProt_ID'].tolist()
