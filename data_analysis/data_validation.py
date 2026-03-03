@@ -252,10 +252,11 @@ class DataValidator:
         
     def plot_highest_assignment_targets(self, top_n=20, plot_output=None):
         '''Identifies the most common function/domain targets of assignments and outputs a plot.'''
-        if 'DeepGO_BP' in self.data.columns or 'DeepGO_MF' in self.data.columns or 'DeepGO_CC' in self.data.columns:
-            proteins_per_function = self.data.groupby('DeepGO_BP').size().sort_values(ascending=False).head(top_n) if 'DeepGO_BP' in self.data.columns else pd.Series()
-            proteins_per_function = proteins_per_function.append(self.data.groupby('DeepGO_MF').size().sort_values(ascending=False).head(top_n) if 'DeepGO_MF' in self.data.columns else pd.Series())
-            proteins_per_function = proteins_per_function.append(self.data.groupby('DeepGO_CC').size().sort_values(ascending=False).head(top_n) if 'DeepGO_CC' in self.data.columns else pd.Series())
+        deepgo_columns = ['DeepGO_BP', 'DeepGO_MF', 'DeepGO_CC']
+        available_columns = [col for col in deepgo_columns if col in self.data.columns]
+        if available_columns:
+            column_to_use = available_columns[0]  # Use the first one found
+            proteins_per_function = self.data.groupby(column_to_use).size()
             if plot_output:
                 plt.figure(figsize=(12, 8))
                 sns.barplot(x=proteins_per_function.values, y=proteins_per_function.index)
@@ -364,10 +365,11 @@ class DataValidator:
         
     def measure_assignments_per_function(self, plot_output=None):
         '''Measures the number of proteins assigned per function/domain and adds it to the report, plotting a histogram if specified.'''
-        if 'DeepGO_BP' in self.data.columns or 'DeepGO_MF' in self.data.columns or 'DeepGO_CC' in self.data.columns:
-            proteins_per_function = self.data.groupby('DeepGO_BP').size() if 'DeepGO_BP' in self.data.columns else pd.Series()
-            proteins_per_function = proteins_per_function.append(self.data.groupby('DeepGO_MF').size() if 'DeepGO_MF' in self.data.columns else pd.Series())
-            proteins_per_function = proteins_per_function.append(self.data.groupby('DeepGO_CC').size() if 'DeepGO_CC' in self.data.columns else pd.Series())
+        deepgo_columns = ['DeepGO_BP', 'DeepGO_MF', 'DeepGO_CC']
+        available_columns = [col for col in deepgo_columns if col in self.data.columns]
+        if available_columns:
+            column_to_use = available_columns[0]  # Use the first one found
+            proteins_per_function = self.data.groupby(column_to_use).size()
             self.report['Proteins per Function Mean'] = round(proteins_per_function.mean(), 2)
             self.report['Proteins per Function Median'] = round(proteins_per_function.median(), 2)
             self.report['Proteins per Function Range'] = round(proteins_per_function.min(), 2), round(proteins_per_function.max(), 2)
