@@ -88,6 +88,14 @@ class DataValidator:
         self.check_id_consistency()
         return self.report
     
+    def run_relationship_checks(self):
+        '''Runs checks specific to relationship-type datasets and returns the report.'''
+        self.run_common_checks()
+        self.count_unique_relationships()
+        self.measure_relationship_score_distribution(plot_output=f"data/4_analysis/{self.dataset_name}_score_distribution.png")
+        self.measure_relationships_per_source(plot_output=f"data/4_analysis/{self.dataset_name}_relationships_per_source.png")
+        return self.report
+
     def count_unique_relationships(self):
         '''Counts the number of unique relationships/interactions in the dataset (single direction) and adds it to the report.'''
         if 'PPI_source' in self.data.columns and 'PPI_target' in self.data.columns:
@@ -211,6 +219,12 @@ if __name__ == "__main__":
     # pfam (2)
     # prosite (2)
     # string ppi (2)
+    rv_string_validator = DataValidator('data/3_organized/RV_STRING_ppi.tsv', rv_uniprot_id_list, 'RV STRING PPI')
+    he_string_validator = DataValidator('data/3_organized/HE_STRING_ppi.tsv', he_uniprot_id_list, 'HE STRING PPI')
+    rv_string_validator.run_relationship_checks()
+    he_string_validator.run_relationship_checks()
+    rv_string_validator.output_report('data/4_analysis/RV_STRING_PPI_validation_report.tsv')
+    he_string_validator.output_report('data/4_analysis/HE_STRING_PPI_validation_report.tsv')
     # esm-2 similarity (1)
 
 
