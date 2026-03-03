@@ -73,6 +73,10 @@ class DataValidator:
             non_unique_proteins_count = len(self.data) - len(unique_proteins)
         elif self.data.columns[0] == 'PPI_source':
             unique_proteins = set(self.data['PPI_source'].dropna().astype(str).tolist() + self.data['PPI_target'].dropna().astype(str).tolist())
+        elif self.data.columns[0] == 'protein1' and self.data.columns[1] == 'protein2':
+            unique_proteins = set(self.data['protein1'].dropna().astype(str).tolist() + self.data['protein2'].dropna().astype(str).tolist())
+        else:
+            print(f"Warning: Unrecognized column format in {self.dataset_name} for protein source counting.")
         self.report['Number of Unique Proteins'] = len(unique_proteins)
         self.report['Number of Non-Unique or Duplicate Proteins'] = non_unique_proteins_count
         return len(unique_proteins)
@@ -84,6 +88,8 @@ class DataValidator:
             dataset_ids = set(self.data['UniProt_ID'].dropna().astype(str).tolist())
         elif 'PPI_source' in self.data.columns and 'PPI_target' in self.data.columns:
             dataset_ids = set(self.data['PPI_source'].dropna().astype(str).tolist() + self.data['PPI_target'].dropna().astype(str).tolist())
+        elif 'protein1' in self.data.columns and 'protein2' in self.data.columns:
+            dataset_ids = set(self.data['protein1'].dropna().astype(str).tolist() + self.data['protein2'].dropna().astype(str).tolist())
         else:
             print(f"Warning: No UniProt_ID or PPI_source/PPI_target columns found in {self.dataset_name} for consistency check.")
             return None
@@ -253,5 +259,6 @@ if __name__ == "__main__":
     rv_string_validator.output_report('data/4_analysis/RV_STRING_PPI_validation_report.tsv')
     he_string_validator.output_report('data/4_analysis/HE_STRING_PPI_validation_report.tsv')
     # esm-2 similarity (1)
-
-
+    merged_esm_validator = DataValidator('data/3_organized/embedding_similarity_edge_list.tsv', merged_uniprot_id_list, 'Merged ESM-2 Similarity')
+    merged_esm_validator.run_relationship_checks()
+    merged_esm_validator.output_report('data/4_analysis/Merged_ESM-2_Similarity_validation_report.tsv')
