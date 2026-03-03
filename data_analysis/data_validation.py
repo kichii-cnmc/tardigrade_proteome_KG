@@ -31,7 +31,6 @@ def load_protein_info(protein_info_file):
     df = pd.read_csv(protein_info_file, sep='\t')
     return df
 
-
 class DataValidator:
     def __init__(self, filepath, base_id_list, dataset_name):
         self.filepath = filepath
@@ -65,6 +64,7 @@ class DataValidator:
     
     def check_id_consistency(self):
         '''Checks that all UniProt IDs in the dataset are present in the base ID list.'''
+        self.report['Base ID List Size'] = len(self.base_id_list)
         if 'UniProt_ID' in self.data.columns:
             dataset_ids = set(self.data['UniProt_ID'].dropna().astype(str).tolist())
         elif 'PPI_source' in self.data.columns and 'PPI_target' in self.data.columns:
