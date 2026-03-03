@@ -273,8 +273,8 @@ class DataValidator:
                 plt.savefig(plot_output)
                 plt.close()
             return proteins_per_function
-        elif 'Pfam Domain' in self.data.columns:
-            proteins_per_domain = self.data.groupby('Pfam Domain').size().sort_values(ascending=False).head(top_n)
+        elif 'Pfam_domains' in self.data.columns:
+            proteins_per_domain = self.data.groupby('Pfam_domains').size().sort_values(ascending=False).head(top_n)
             if plot_output:
                 plt.figure(figsize=(12, 8))
                 sns.barplot(x=proteins_per_domain.values, y=proteins_per_domain.index)
@@ -284,8 +284,8 @@ class DataValidator:
                 plt.savefig(plot_output)
                 plt.close()
             return proteins_per_domain
-        elif 'PROSITE Domain' in self.data.columns:
-            proteins_per_domain = self.data.groupby('PROSITE Domain').size().sort_values(ascending=False).head(top_n)
+        elif 'PROSITE_annotations' in self.data.columns:
+            proteins_per_domain = self.data.groupby('PROSITE_annotations').size().sort_values(ascending=False).head(top_n)
             if plot_output:
                 plt.figure(figsize=(12, 8))
                 sns.barplot(x=proteins_per_domain.values, y=proteins_per_domain.index)
@@ -330,12 +330,12 @@ class DataValidator:
                 unique_assignments.update(set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['DeepGO_CC'].dropna().astype(str).tolist())))
             self.report['Number of Unique Protein-Function Assignments'] = len(unique_assignments)
             return len(unique_assignments)
-        elif 'UniProt_ID' in self.data.columns and 'Pfam Domain' in self.data.columns:
-            unique_assignments = set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['Pfam Domain'].dropna().astype(str).tolist()))
+        elif 'UniProt_ID' in self.data.columns and 'Pfam_domains' in self.data.columns:
+            unique_assignments = set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['Pfam_domains'].dropna().astype(str).tolist()))
             self.report['Number of Unique Protein-Domain Assignments'] = len(unique_assignments)
             return len(unique_assignments)
-        elif 'UniProt_ID' in self.data.columns and 'PROSITE Domain' in self.data.columns:
-            unique_assignments = set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['PROSITE Domain'].dropna().astype(str).tolist()))
+        elif 'UniProt_ID' in self.data.columns and 'PROSITE_annotations' in self.data.columns:
+            unique_assignments = set(zip(self.data['UniProt_ID'].dropna().astype(str).tolist(), self.data['PROSITE_annotations'].dropna().astype(str).tolist()))
             self.report['Number of Unique Protein-Domain Assignments'] = len(unique_assignments)
             return len(unique_assignments)
         else:
@@ -358,7 +358,7 @@ class DataValidator:
                 plt.savefig(plot_output)
                 plt.close()
             return self.report
-        elif 'UniProt_ID' in self.data.columns and ('Pfam_domain' in self.data.columns or 'PROSITE_annotations' in self.data.columns):
+        elif 'UniProt_ID' in self.data.columns and ('Pfam_domains' in self.data.columns or 'PROSITE_annotations' in self.data.columns):
             assignments_per_protein = self.data.groupby('UniProt_ID').size()
             self.report['Assignments per Protein Mean'] = round(assignments_per_protein.mean(), 2)
             self.report['Assignments per Protein Median'] = round(assignments_per_protein.median(), 2)
