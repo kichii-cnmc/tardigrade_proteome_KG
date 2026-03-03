@@ -53,7 +53,7 @@ class IGraphBuilder:
         'PPI_target': 'Protein',
         'protein2': 'Protein'
     }
-    GRAPH_NODE_ALIAS_TYPES = ['NCBI_ID', 'Organism', 'Gene_Name', 'AF_structures'] # columns that can be added as node attributes
+    GRAPH_NODE_ALIAS_TYPES = ['NCBI_ID', 'Gene_Name', 'AF_structures'] # columns that can be added as node attributes
     ALIAS_MAPPER = AliasManager()
 
     def __init__(self):
