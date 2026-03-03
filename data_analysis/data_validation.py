@@ -273,6 +273,24 @@ class DataValidator:
         else:
             print(f"Warning: No GO Term, Pfam Domain, or PROSITE Domain column found in {self.dataset_name} for highest assignment targets measurement.")
             return None
+        
+    def measure_assignment_score_distribution(self, plot_output=None):
+        '''Measures the distribution of scores in the assignment dataset and adds it to the report.'''
+        if 'Score' in self.data.columns:
+            self.report['Assignment Score Mean'] = round(self.data['Score'].mean(), 4)
+            self.report['Assignment Score Median'] = round(self.data['Score'].median(), 4)
+            self.report['Assignment Score Range'] = round(self.data['Score'].min(), 4), round(self.data['Score'].max(), 4)
+            if plot_output:
+                plt.figure(figsize=(10, 6))
+                sns.histplot(self.data['Score'], bins=50, kde=True)
+                plt.title(f'Assignment Score Distribution for {self.dataset_name}')
+                plt.xlabel('Assignment Score')
+                plt.ylabel('Frequency')
+                plt.savefig(plot_output)
+            return self.report
+        else:
+            print(f"Warning: No Score column found in {self.dataset_name} for assignment score distribution measurement.")
+            return None
 
 if __name__ == "__main__":
     # Load base UniProt ID list from the protein info datasets for consistency checks
