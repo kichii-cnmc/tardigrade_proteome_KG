@@ -389,6 +389,9 @@ class IGraphBuilder:
             print(f"No relations found for '{search_name}' because the node does not exist.")
             return []
 
+    def save_graphml(self, file_path):
+        self.graph.write_graphml(file_path)
+
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="Build a graph from TSV files using igraph.")
     argparser.add_argument("tsv_folder", type=str, help="Path to the folder containing TSV files.")
@@ -414,3 +417,4 @@ if __name__ == "__main__":
     graph_builder.visualize_graph(graph_builder.sample_node_subgraph("GAV06484.1"), "GAV06484.1_subgraph.png")
     graph_builder.output_triples("graph_triples.tsv")
     graph_builder.output_nodes("graph_nodes.tsv")
+    graph_builder.save_graphml("graph.graphml")
