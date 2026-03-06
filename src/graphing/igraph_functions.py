@@ -4,28 +4,25 @@ import torch
 import igraph as ig
 import numpy as np
 import argparse
-from torch_geometric.data import Data
-from torch_geometric.nn import GCNConv, global_mean_pool
-from torch_geometric.utils import from_networkx
-from torch_geometric.loader import DataLoader
+import pykeen
+from pykeen.triples import TriplesFactory
+
 
 if __name__ == "__main__":
+    argparser = argparse.ArgumentParser(description="Predict links in a knowledge graph using R-GCN")
+    argparser.add_argument("graphml_file", type=str, help="Path to the input graphml file")
+    argparser.add_argument("--query_nodes", type=str, default="Dsup", help="Comma-separated list of query node IDs (e.g., 'protein1,trait1')")
+    argparser.add_argument("--top_k", type=int, default=10, help="Number of predicted top linking proteins to output")
+    args = argparser.parse_args()
 
     # open graph from graphml file with igraph
 
-    # extract edge index, edge type, and edge norm as PyTorch tensors
+    # extract triples (source, label, target), edge-weights, and node-types from the graph
 
-    # define relational graph convolutional network (R-GCN) model
+    # use TriplesFactory.from_labeled_triples to create a TriplesFactory for pykeen
+    # tf = TriplesFactory.from_labeled_triples(triples)
 
+    # fit an R-GCN model to the data using pykeen
 
-    # add a link prediction layer to the R-GCN model (DistMult or ComplEx)
-
-
-    # train the model on the graph data
-
-
-    # input query node set (protein/traits) and rank link probabilities to the query node set
-
-
-    # output top-k predicted links with their probabilities and supporting evidence from the graph (e.g., neighboring nodes and edges)
+    # make predictions for the specified query nodes and output the top-k predicted linking proteins for the query set
 
