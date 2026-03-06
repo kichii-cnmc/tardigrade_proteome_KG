@@ -19,6 +19,19 @@ random.seed(42)
 np.random.seed(42)
 torch.manual_seed(42)
 
+def build_triples_typing_set(g):
+    '''Build a set of valid (source_type, relation_type, target_type) triples based on the graph's node and edge attributes'''
+    valid_triple_types = set()
+    for edge in g.es:
+        relation = edge["edge_type"]
+        source_type = g.vs[edge.source]["node_type"] if "node_type" in g.vs[edge.source].attributes() else "unknown"
+        target_type = g.vs[edge.target]["node_type"] if "node_type" in g.vs[edge.target].attributes() else "unknown"
+        valid_triple_types.add((source_type, relation, target_type))
+    return valid_triple_types
+
+def check_triple_type_validity(query_triple, valid_triples_set):
+    '''Check if a triple's typing exists in the TriplesFactory based on the node_type and edge_type'''
+    return query_triple in valid_triples_set
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="Predict links in a knowledge graph using R-GCN")
@@ -34,6 +47,8 @@ if __name__ == "__main__":
     triples = []
     edge_weights = []
     node_types = {}
+    valid_triple_types = build_triples_typing_set(g)
+
     for edge in g.es:
         source = g.vs[edge.source]["name"]
         target = g.vs[edge.target]["name"]
@@ -59,32 +74,12 @@ if __name__ == "__main__":
     training, testing, validation = tf.split([0.7, 0.2, 0.1])  # 70/20/10 split
 
     # Step 2: Knowledge Graph Embedding with ComplEx model and soft loss
-    results = pipeline(
-        training=training,
-        testing=testing,
-        validation=validation,
-        model='ComplEx',  # Use ComplEx for directed relations
-        model_kwargs={'embedding_dim': 200},  # Higher dim for better representation
-        training_kwargs={'num_epochs': 150, 'batch_size': 512},
-        loss='SoftplusLoss',  # Soft loss for weak signals
-        loss_kwargs={'reduction': 'mean'},
-        device='cpu',
-    )
+    model = pykeen.models.ComplEx(triples_factory=training, embedding_dim=200)
+    training_loop = SLCWATrainingLoop(model=model, triples_factory=training)
     
-    print(f"Finished training ComplEx model with soft loss")
-
-    model = results.model
+    # Train the model
+    training_loop.train(num_epochs=150, batch_size=512, use_tqdm=True)
     print("Finished training the model")
-
-    # # create a weighted loss function that incorporates the edge weights into the training process
-    # weights_tensor = torch.tensor(edge_weights, dtype=torch.float)
-    # loss = MarginRankingLoss(margin=1.0)
-    # training_loop = SLCWATrainingLoop(model=model, triples_factory=tf, loss=loss, sample_weights=weights_tensor)
-    # print("Initialized training loop with weighted loss function")
-
-    # # train the model
-    # training_loop.train(num_epochs=100, batch_size=256, use_tqdm=True)
-    # print("Finished training the model")
 
     # evaluate the model
     evaluator = RankBasedEvaluator()
@@ -157,6 +152,12 @@ if __name__ == "__main__":
                 
                 for target_entity in all_entities:
                     try:
+                        query_type = node_types.get(query_entity, 'unknown')
+                        target_type = node_types.get(target_entity, 'unknown')
+                        if not check_triple_type_validity((query_type, relation, target_type), valid_triple_types):
+                            # print(f"Skipping invalid triple type: ({query_entity}, {relation}, {target_entity})")
+                            continue
+                        print(f"Scoring triple: ({query_entity}, {relation}, {target_entity})")
                         # Score the triple (query, relation, target)
                         triple = torch.tensor([[
                             tf.entity_to_id[query_entity],
