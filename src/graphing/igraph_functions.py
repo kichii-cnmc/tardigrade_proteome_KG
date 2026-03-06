@@ -157,7 +157,7 @@ if __name__ == "__main__":
                         if not check_triple_type_validity((query_type, relation, target_type), valid_triple_types):
                             # print(f"Skipping invalid triple type: ({query_entity}, {relation}, {target_entity})")
                             continue
-                        print(f"Scoring triple: ({query_entity}, {relation}, {target_entity})")
+                        # print(f"Scoring triple: ({query_entity}, {relation}, {target_entity})")
                         # Score the triple (query, relation, target)
                         triple = torch.tensor([[
                             tf.entity_to_id[query_entity],
