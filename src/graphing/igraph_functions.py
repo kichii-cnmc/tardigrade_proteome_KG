@@ -78,7 +78,7 @@ if __name__ == "__main__":
     training_loop = SLCWATrainingLoop(model=model, triples_factory=training)
     
     # Train the model
-    training_loop.train(num_epochs=150, batch_size=512, use_tqdm=True)
+    training_loop.train(triples_factory=training,num_epochs=150, batch_size=512, use_tqdm=True)
     print("Finished training the model")
 
     # evaluate the model
