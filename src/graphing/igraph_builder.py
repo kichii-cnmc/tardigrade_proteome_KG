@@ -361,11 +361,13 @@ class IGraphBuilder:
         '''Removes all edges with weight below the specified threshold.'''
         edges_to_remove = [e.index for e in self.graph.es if e['weight'] < min_weight]
         self.graph.delete_edges(edges_to_remove)
+        print(f"Removed {len(edges_to_remove)} edges with weight below {min_weight}. Remaining edges: {self.graph.ecount()}")
 
     def filter_nodes_by_degree(self, min_degree):
         '''Removes all nodes with degree below the specified threshold.'''
         nodes_to_remove = [v.index for v in self.graph.vs if self.graph.degree(v.index) < min_degree]
         self.graph.delete_vertices(nodes_to_remove)
+        print(f"Removed {len(nodes_to_remove)} nodes with degree below {min_degree}. Remaining nodes: {self.graph.vcount()}")
 
     def output_nodes(self, output_path):
         with open(output_path, 'w') as f:
@@ -421,7 +423,7 @@ if __name__ == "__main__":
     for file in files_in_folder:
         print(f"Processing file: {file}")
         graph_builder.add_to_graph_tsv(file)
-    graph_builder.filter_edges_by_weight(min_weight=0.6)  # Example threshold, adjust as needed
+    graph_builder.filter_edges_by_weight(min_weight=0.3)  # Example threshold, adjust as needed
     graph_builder.filter_nodes_by_degree(min_degree=1)  # Example threshold, adjust as needed
     graph_builder.evaluate_graph()
     print()
