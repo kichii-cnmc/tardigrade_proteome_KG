@@ -23,7 +23,7 @@ torch.manual_seed(42)
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="Predict links in a knowledge graph using R-GCN")
     argparser.add_argument("graphml_file", type=str, help="Path to the input graphml file")
-    argparser.add_argument("--query_nodes", type=str, default="Dsup", help="Comma-separated list of query node IDs (e.g., 'protein1,trait1')")
+    argparser.add_argument("--query_nodes", type=str, default="A0A1D1UC20", help="Comma-separated list of query node IDs (e.g., 'protein1,trait1')")
     argparser.add_argument("--top_k", type=int, default=10, help="Number of predicted top linking proteins to output")
     args = argparser.parse_args()
 
@@ -43,7 +43,7 @@ if __name__ == "__main__":
         edge_weights.append(weight)
     for vertex in g.vs:
         node_id = vertex["name"]
-        node_type = vertex["type"] if "type" in vertex.attributes() else "unknown"
+        node_type = vertex["node_type"] if "node_type" in vertex.attributes() else "unknown"
         node_types[node_id] = node_type
 
     print(f"Extracted {len(triples)} triples from the graph")
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     print(f"Number of relations: {model.num_relations}")
 
     # Check entity and relation mappings
-    print(f"Entities: {list(tf.entity_to_id.keys())[:10]}...")  # Show first 10
+    print(f"Entities: {list(tf.entity_to_id.keys())[:5]}...")  # Show first 10
     print(f"Relations: {list(tf.relation_to_id.keys())}")
 
     # Step 3: Multi-Source Querying and Step 4: Rank-Based Evidence Aggregation
@@ -130,7 +130,21 @@ if __name__ == "__main__":
         entity_relations = defaultdict(list)
         entity_ranks = defaultdict(list)
         
-        all_entities = [e for e in tf.entity_to_id.keys() if e not in valid_queries]
+        # Check entity and relation mappings
+        print(f"Entities: {list(tf.entity_to_id.keys())[:5]}...")  # Show first 5
+        print(f"Relations: {list(tf.relation_to_id.keys())}")
+
+        # Debug: Check what node types exist
+        type_counts = Counter(node_types.values())
+        print(f"\nNode types in knowledge graph:")
+        for node_type, count in type_counts.most_common():
+            print(f"  {node_type}: {count}")
+        print()
+
+        # Filter for protein targets only
+        all_entities = [e for e in tf.entity_to_id.keys() 
+                       if e not in valid_queries and 'protein' in node_types.get(e, '').lower()]
+        print(f"Filtering for protein targets: {len(all_entities)} protein entities found")
         
         for query_idx, query_entity in enumerate(valid_queries):
             print(f"Processing query {query_idx+1}/{len(valid_queries)}: {query_entity}")
@@ -171,22 +185,24 @@ if __name__ == "__main__":
                 entity_relations[target_entity].append((query_entity, relation, score, rank+1))
                 entity_ranks[target_entity].append(rank + 1)
         
-        # Step 5: Generate final ranked list
+        # Step 5: Generate final ranked list with multiple evidence relations
         final_predictions = []
         for entity, rrf_score in sorted(entity_scores.items(), key=lambda x: x[1], reverse=True):
-            # Find best contributing relation
-            best_relation = max(entity_relations[entity], key=lambda x: x[2])
+            # Get top 3-5 contributing relations as evidence
+            sorted_relations = sorted(entity_relations[entity], key=lambda x: x[2], reverse=True)
+            evidence_relations = sorted_relations[:min(5, len(sorted_relations))]
             avg_rank = sum(entity_ranks[entity]) / len(entity_ranks[entity])
             
             final_predictions.append({
                 'target_entity': entity,
                 'rrf_score': rrf_score,
-                'best_source': best_relation[0],
-                'best_relation': best_relation[1], 
-                'best_score': best_relation[2],
+                'evidence_relations': evidence_relations,  # List of (source, relation, score, rank) tuples
+                'best_source': evidence_relations[0][0] if evidence_relations else 'unknown',
+                'best_relation': evidence_relations[0][1] if evidence_relations else 'unknown',
+                'best_score': evidence_relations[0][2] if evidence_relations else 0.0,
                 'avg_rank': avg_rank,
                 'num_sources': len(entity_ranks[entity]),
-                'entity_type': node_types.get(entity, 'unknown')
+                'entity_type': node_types.get(entity, 'protein')  # Default to protein since we filtered
             })
         
         return final_predictions[:top_k]
@@ -197,10 +213,11 @@ if __name__ == "__main__":
         
         for pred in predictions:
             pred['is_novel'] = True
-            # Check if best source-target combination already exists
-            best_triple = (pred['best_source'], pred['best_relation'], pred['target_entity'])
-            if best_triple in existing_set:
-                pred['is_novel'] = False
+            # Check if any evidence relation already exists
+            for source, relation, score, rank in pred['evidence_relations']:
+                if (source, relation, pred['target_entity']) in existing_set:
+                    pred['is_novel'] = False
+                    break
         
         return predictions
 
@@ -228,16 +245,26 @@ if __name__ == "__main__":
     for i, pred in enumerate(predictions):
         novelty_flag = "🆕 NOVEL" if pred['is_novel'] else "♻️ Known"
         print(f"{i+1:2d}. {pred['target_entity']} ({pred['entity_type']})")
-        print(f"     RRF Score: {pred['rrf_score']:.4f} | Avg Rank: {pred['avg_rank']:.1f}")
-        print(f"     Best Source: {pred['best_source']} --[{pred['best_relation']}]--> {pred['target_entity']}")
-        print(f"     Evidence from {pred['num_sources']} sources | {novelty_flag}")
+        print(f"     RRF Score: {pred['rrf_score']:.4f} | Avg Rank: {pred['avg_rank']:.1f} | {novelty_flag}")
+        print(f"     Evidence Relations ({len(pred['evidence_relations'])}):") 
+        
+        for j, (source, relation, score, rank) in enumerate(pred['evidence_relations']):
+            print(f"       {j+1}. {source} --[{relation}]--> {pred['target_entity']} (score: {score:.4f}, rank: {rank})")
+        
+        print(f"     Multi-source evidence from {pred['num_sources']} query sources")
         print()
     
     # Summary statistics
-    novel_count = sum(1 for p in predictions if p['is_novel'])
-    protein_count = sum(1 for p in predictions if 'protein' in p['entity_type'].lower())
-    
-    print(f"=== Summary ===")
-    print(f"Novel predictions: {novel_count}/{len(predictions)}")
-    print(f"Protein targets: {protein_count}/{len(predictions)}")
-    print(f"Multi-source evidence (avg): {sum(p['num_sources'] for p in predictions)/len(predictions):.1f} sources per prediction")
+    if predictions:
+        novel_count = sum(1 for p in predictions if p['is_novel'])
+        avg_evidence_relations = sum(len(p['evidence_relations']) for p in predictions) / len(predictions)
+        avg_sources = sum(p['num_sources'] for p in predictions) / len(predictions)
+        
+        print(f"=== Summary ===")
+        print(f"Protein targets found: {len(predictions)}")
+        print(f"Novel predictions: {novel_count}/{len(predictions)} ({novel_count/len(predictions)*100:.1f}%)")
+        print(f"Evidence relations per prediction: {avg_evidence_relations:.1f} (avg)")
+        print(f"Multi-source evidence: {avg_sources:.1f} query sources per prediction (avg)")
+    else:
+        print(f"=== No protein predictions found ===")
+        print(f"Try expanding query or checking if proteins exist in the knowledge graph")
