@@ -300,7 +300,11 @@ class IGraphBuilder:
             'embeddings_similar_to': "#2D00E1",
             None: '#CCCCCC',
         }
-
+        # Find the indices of vertices with a degree of 0
+        isolated_vertices_indices = [v.index for v in g.vs if v.degree() == 0]
+        # Delete the identified vertices
+        g.delete_vertices(isolated_vertices_indices)
+        
         vertex_colors = [NODE_TYPE_COLORS.get(v['node_type'], '#CCCCCC') for v in g.vs]
         degrees = g.degree()
         max_deg = max(degrees) if degrees else 1
