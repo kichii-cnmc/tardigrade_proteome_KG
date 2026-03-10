@@ -304,7 +304,7 @@ class IGraphBuilder:
         isolated_vertices_indices = [v.index for v in g.vs if v.degree() == 0]
         # Delete the identified vertices
         g.delete_vertices(isolated_vertices_indices)
-        
+
         vertex_colors = [NODE_TYPE_COLORS.get(v['node_type'], '#CCCCCC') for v in g.vs]
         degrees = g.degree()
         max_deg = max(degrees) if degrees else 1
@@ -319,7 +319,7 @@ class IGraphBuilder:
             g,
             output_path,
             layout=layout,
-            bbox=(4800, 4800),
+            bbox=(1200, 800),
             margin=120,
             vertex_color=vertex_colors,
             vertex_size=vertex_sizes,
@@ -431,12 +431,12 @@ if __name__ == "__main__":
     graph_builder.filter_nodes_by_degree(min_degree=1)  # Example threshold, adjust as needed
     graph_builder.evaluate_graph()
     print()
-    node_relations = graph_builder.get_node_relations("GO:0016773")  # Example node name, adjust as needed
+    node_relations = graph_builder.get_node_relations("A0A1D1V419")  # Example node name, adjust as needed
     for relation in node_relations:
         print(relation)
     print()
     graph_builder.visualize_graph(graph_builder.sample_representative_subgraph(k = 4), "graph_visualization.png")
-    graph_builder.visualize_graph(graph_builder.sample_node_subgraph("GAV06484.1"), "GAV06484.1_subgraph.png")
+    graph_builder.visualize_graph(graph_builder.sample_node_subgraph("A0A1D1V419"), "A0A1D1VV69_subgraph.png")
     graph_builder.output_triples("graph_triples.tsv")
     graph_builder.output_nodes("graph_nodes.tsv")
     graph_builder.save_graphml("graph.graphml")
