@@ -97,6 +97,96 @@ def evaluate_link_prediction(model, edge_index, edge_types, num_nodes, device, t
         'AUC': auc
     }
 
+def evaluate_link_prediction_fold(model, train_edge_index, train_edge_types, 
+                                 test_edge_index, test_edge_types, num_nodes, device):
+    """
+    Evaluate model on a specific test fold, ensuring no data leakage.
+    """
+    model.eval()
+    
+    # Get embeddings using training edges only
+    with torch.no_grad():
+        z = model.encode(train_edge_index, train_edge_types)
+    
+    # Evaluation metrics storage
+    mrr_scores = []
+    hits_at_1 = []
+    hits_at_10 = []
+    all_scores = []
+    all_labels = []
+    
+    num_test = test_edge_index.size(1)
+    print(f"Evaluating {num_test} test edges...")
+    
+    for i in range(num_test):
+        src, dst = test_edge_index[0, i].item(), test_edge_index[1, i].item()
+        rel_type = test_edge_types[i].item()
+        
+        # Generate all possible destination nodes for this source
+        all_dsts = torch.arange(num_nodes, device=device)
+        src_tensor = torch.full((num_nodes,), src, dtype=torch.long, device=device)
+        rel_tensor = torch.full((num_nodes,), rel_type, dtype=torch.long, device=device)
+        
+        test_edge_batch = torch.stack([src_tensor, all_dsts], dim=0)
+        
+        # Get scores for all possible destinations
+        with torch.no_grad():
+            scores = model.decode(z, test_edge_batch, rel_tensor)
+            scores = torch.sigmoid(scores)
+        
+        # Create labels (1 for true destination, 0 for others)
+        labels = torch.zeros(num_nodes, device=device)
+        labels[dst] = 1
+        
+        # Remove self-loops and training edges for fair evaluation
+        if src < len(scores):
+            scores[src] = -float('inf')
+            
+        # Optional: Remove training edges from consideration (filtered evaluation)
+        # This prevents the model from being "rewarded" for predicting training edges
+        train_mask = torch.zeros(num_nodes, dtype=torch.bool, device=device)
+        for j in range(train_edge_index.size(1)):
+            if train_edge_index[0, j] == src and train_edge_types[j] == rel_type:
+                train_mask[train_edge_index[1, j]] = True
+        scores[train_mask] = -float('inf')
+        
+        # Store for AUC calculation
+        valid_mask = scores != -float('inf')
+        all_scores.extend(scores[valid_mask].cpu().numpy())
+        all_labels.extend(labels[valid_mask].cpu().numpy())
+        
+        # Calculate ranking metrics
+        _, sorted_indices = torch.sort(scores, descending=True)
+        rank = (sorted_indices == dst).nonzero(as_tuple=True)[0].item() + 1
+        
+        # MRR
+        mrr_scores.append(1.0 / rank)
+        
+        # Hits@K
+        hits_at_1.append(1.0 if rank <= 1 else 0.0)
+        hits_at_10.append(1.0 if rank <= 10 else 0.0)
+        
+        if i % 50 == 0:
+            print(f"  Evaluated {i}/{num_test} test edges")
+    
+    # Calculate final metrics
+    mrr = np.mean(mrr_scores)
+    hits_1 = np.mean(hits_at_1)
+    hits_10 = np.mean(hits_at_10)
+    
+    # Calculate AUC
+    if len(all_scores) > 0:
+        auc = roc_auc_score(all_labels, all_scores)
+    else:
+        auc = 0.0
+    
+    return {
+        'MRR': mrr,
+        'Hits@1': hits_1,
+        'Hits@10': hits_10,
+        'AUC': auc
+    }
+
 def evaluate_ranking_quality(model, edge_index, edge_types, query_nodes, target_nodes, num_relations, device):
     """
     Evaluate ranking quality for specific query-target pairs.
@@ -275,3 +365,97 @@ if __name__ == "__main__":
             t_name = g.vs[t_idx]["name"]
             rel_name = [r_idx]
             print(f"[{rel_name}] -> {t_name} | Score: {prob:.4f}")
+
+def five_fold_cross_validation(edge_index, edge_types, num_nodes, num_relations, device, hidden_dim=64, epochs=100):
+    """
+    Perform 5-fold cross validation on edge prediction.
+    """
+    from sklearn.model_selection import KFold
+    import torch
+    
+    # Convert to numpy for sklearn KFold
+    num_edges = edge_index.size(1)
+    edge_indices = np.arange(num_edges)
+    
+    # Initialize KFold
+    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+    
+    fold_results = []
+    
+    for fold_idx, (train_idx, test_idx) in enumerate(kf.split(edge_indices)):
+        print(f"\n=== FOLD {fold_idx + 1}/5 ===")
+        
+        # Split edges into train/test for this fold
+        train_edges = edge_index[:, train_idx]
+        train_edge_types = edge_types[train_idx]
+        test_edges = edge_index[:, test_idx]
+        test_edge_types = edge_types[test_idx]
+        
+        print(f"Train edges: {len(train_idx)}, Test edges: {len(test_idx)}")
+        
+        # Initialize fresh model for this fold
+        model = RGCNLinkPrediction(num_nodes, num_relations, hidden_dim).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+        criterion = torch.nn.BCEWithLogitsLoss()
+        
+        # Train on training edges only
+        print("Training model...")
+        for epoch in range(1, epochs + 1):
+            model.train()
+            optimizer.zero_grad()
+            
+            # Get node embeddings using ONLY training edges
+            z = model.encode(train_edges.to(device), train_edge_types.to(device))
+            
+            # Positive samples (training edges)
+            pos_out = model.decode(z, train_edges.to(device), train_edge_types.to(device))
+            pos_loss = criterion(pos_out, torch.ones_like(pos_out))
+            
+            # Negative sampling - corrupt destination nodes
+            neg_dst = torch.randint(0, num_nodes, (train_edges.size(1),), device=device)
+            neg_edge_index = torch.stack([train_edges[0].to(device), neg_dst], dim=0)
+            neg_out = model.decode(z, neg_edge_index, train_edge_types.to(device))
+            neg_loss = criterion(neg_out, torch.zeros_like(neg_out))
+            
+            # Total loss
+            loss = pos_loss + neg_loss
+            loss.backward()
+            optimizer.step()
+            
+            if epoch % 20 == 0 or epoch == 1:
+                print(f"  Epoch {epoch:03d}/{epochs}, Loss: {loss.item():.4f}")
+        
+        # Evaluate on test edges
+        print("Evaluating fold...")
+        fold_metrics = evaluate_link_prediction_fold(
+            model, train_edges.to(device), train_edge_types.to(device),
+            test_edges.to(device), test_edge_types.to(device), 
+            num_nodes, device
+        )
+        
+        fold_results.append(fold_metrics)
+        print(f"Fold {fold_idx + 1} Results:")
+        for metric, value in fold_metrics.items():
+            print(f"  {metric}: {value:.4f}")
+    
+    # Average results across folds
+    avg_results = {}
+    for metric in fold_results[0].keys():
+        avg_results[metric] = np.mean([fold[metric] for fold in fold_results])
+        avg_results[f"{metric}_std"] = np.std([fold[metric] for fold in fold_results])
+    
+    return avg_results, fold_results
+
+# Replace the training section with cross validation
+print("Starting 5-fold cross validation...")
+avg_results, fold_results = five_fold_cross_validation(
+    edge_index, edge_types, num_nodes, num_relations, device, 
+    hidden_dim=64, epochs=args.epochs
+)
+
+print(f"\n=== 5-FOLD CROSS VALIDATION RESULTS ===")
+for metric, value in avg_results.items():
+    if not metric.endswith('_std'):
+        std_key = f"{metric}_std"
+        std_val = avg_results.get(std_key, 0)
+        print(f"{metric}: {value:.4f} ± {std_val:.4f}")
