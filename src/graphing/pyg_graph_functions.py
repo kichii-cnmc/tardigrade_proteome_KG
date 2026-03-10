@@ -4,6 +4,128 @@ import igraph as ig
 import numpy as np
 import argparse
 from torch_geometric.nn import RGCNConv
+from sklearn.metrics import roc_auc_score
+
+def evaluate_link_prediction(model, edge_index, edge_types, num_nodes, device, test_ratio=0.2):
+    """
+    Evaluate the trained model using standard link prediction metrics.
+    """
+    model.eval()
+    
+    # Split edges into train/test
+    num_edges = edge_index.size(1)
+    num_test = int(num_edges * test_ratio)
+    
+    # Random permutation for splitting
+    perm = torch.randperm(num_edges)
+    test_edges = edge_index[:, perm[:num_test]]
+    test_edge_types = edge_types[perm[:num_test]]
+    
+    # Get embeddings
+    with torch.no_grad():
+        z = model.encode(edge_index, edge_types)
+    
+    # Evaluation metrics storage
+    mrr_scores = []
+    hits_at_1 = []
+    hits_at_10 = []
+    all_scores = []
+    all_labels = []
+    
+    print("Evaluating model...")
+    
+    for i in range(num_test):
+        src, dst = test_edges[0, i].item(), test_edges[1, i].item()
+        rel_type = test_edge_types[i].item()
+        
+        # Generate all possible destination nodes for this source
+        all_dsts = torch.arange(num_nodes, device=device)
+        src_tensor = torch.full((num_nodes,), src, dtype=torch.long, device=device)
+        rel_tensor = torch.full((num_nodes,), rel_type, dtype=torch.long, device=device)
+        
+        test_edge_batch = torch.stack([src_tensor, all_dsts], dim=0)
+        
+        # Get scores for all possible destinations
+        with torch.no_grad():
+            scores = model.decode(z, test_edge_batch, rel_tensor)
+            scores = torch.sigmoid(scores)
+        
+        # Create labels (1 for true destination, 0 for others)
+        labels = torch.zeros(num_nodes, device=device)
+        labels[dst] = 1
+        
+        # Remove self-loops for fair evaluation
+        if src < len(scores):
+            scores[src] = -float('inf')
+        
+        # Store for AUC calculation
+        all_scores.extend(scores.cpu().numpy())
+        all_labels.extend(labels.cpu().numpy())
+        
+        # Calculate ranking metrics
+        _, sorted_indices = torch.sort(scores, descending=True)
+        rank = (sorted_indices == dst).nonzero(as_tuple=True)[0].item() + 1
+        
+        # MRR
+        mrr_scores.append(1.0 / rank)
+        
+        # Hits@K
+        hits_at_1.append(1.0 if rank <= 1 else 0.0)
+        hits_at_10.append(1.0 if rank <= 10 else 0.0)
+        
+        if i % 100 == 0:
+            print(f"  Evaluated {i}/{num_test} test edges")
+    
+    # Calculate final metrics
+    mrr = np.mean(mrr_scores)
+    hits_1 = np.mean(hits_at_1)
+    hits_10 = np.mean(hits_at_10)
+    
+    # Calculate AUC
+    from sklearn.metrics import roc_auc_score
+    all_scores = np.array(all_scores)
+    all_labels = np.array(all_labels)
+    
+    # Remove infinite values for AUC calculation
+    valid_mask = np.isfinite(all_scores)
+    auc = roc_auc_score(all_labels[valid_mask], all_scores[valid_mask])
+    
+    return {
+        'MRR': mrr,
+        'Hits@1': hits_1,
+        'Hits@10': hits_10,
+        'AUC': auc
+    }
+
+def evaluate_ranking_quality(model, edge_index, edge_types, query_nodes, target_nodes, num_relations, device):
+    """
+    Evaluate ranking quality for specific query-target pairs.
+    """
+    model.eval()
+    
+    with torch.no_grad():
+        z = model.encode(edge_index, edge_types)
+    
+    ranking_metrics = {}
+    
+    for query_idx in query_nodes:
+        query_scores = {}
+        
+        for rel_idx in range(num_relations):
+            # Create pairs: (Query Node, All Target Nodes)
+            q_tensor = torch.full((len(target_nodes),), query_idx, dtype=torch.long, device=device)
+            target_tensor = torch.tensor(target_nodes, dtype=torch.long, device=device)
+            test_edges = torch.stack([q_tensor, target_tensor], dim=0)
+            
+            # Use specific relation
+            r_tensor = torch.full((len(target_nodes),), rel_idx, dtype=torch.long, device=device)
+            
+            scores = torch.sigmoid(model.decode(z, test_edges, r_tensor))
+            query_scores[rel_idx] = scores.cpu().numpy()
+        
+        ranking_metrics[query_idx] = query_scores
+    
+    return ranking_metrics
 
 class RGCNLinkPrediction(torch.nn.Module):
     def __init__(self, num_nodes, num_relations, hidden_dim):
@@ -54,6 +176,7 @@ if __name__ == "__main__":
     edge_types = torch.tensor([edge_type_map[etype] for etype in g.es["edge_type"]], dtype=torch.long)
     node_types = torch.tensor([node_type_map[ntype] for ntype in g.vs["node_type"]], dtype=torch.long) if node_type_map else None
 
+    print(f"Edge Types: {edge_type_map}")
     num_nodes = g.vcount()
     num_relations = int(edge_types.max().item() + 1)
     
@@ -96,6 +219,17 @@ if __name__ == "__main__":
         
         if epoch % 20 == 0 or epoch == 1:
             print(f"  Epoch {epoch:03d}/{args.epochs}, Loss: {loss.item():.4f}")
+
+    # evaluate model
+    # Evaluate model performance
+    print("\nEvaluating model performance...")
+    eval_metrics = evaluate_link_prediction(model, edge_index, edge_types, num_nodes, device)
+
+    print(f"\nEvaluation Results:")
+    print(f"Mean Reciprocal Rank (MRR): {eval_metrics['MRR']:.4f}")
+    print(f"Hits@1: {eval_metrics['Hits@1']:.4f}")
+    print(f"Hits@10: {eval_metrics['Hits@10']:.4f}")
+    print(f"AUC: {eval_metrics['AUC']:.4f}")
 
     # 3. Filtered Inference
     model.eval()
