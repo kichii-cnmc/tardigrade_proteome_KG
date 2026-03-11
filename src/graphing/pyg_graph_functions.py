@@ -249,6 +249,86 @@ def mapping_types_to_indices(g):
     edge_type_mapping = {etype: idx for idx, etype in enumerate(set(g.es["edge_type"]))}
     return node_type_mapping, edge_type_mapping
 
+def five_fold_cross_validation(edge_index, edge_types, num_nodes, num_relations, device, hidden_dim=64, epochs=100):
+    """
+    Perform 5-fold cross validation on edge prediction.
+    """
+    from sklearn.model_selection import KFold
+    import torch
+    
+    # Convert to numpy for sklearn KFold
+    num_edges = edge_index.size(1)
+    edge_indices = np.arange(num_edges)
+    
+    # Initialize KFold
+    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+    
+    fold_results = []
+    
+    for fold_idx, (train_idx, test_idx) in enumerate(kf.split(edge_indices)):
+        print(f"\n=== FOLD {fold_idx + 1}/5 ===")
+        
+        # Split edges into train/test for this fold
+        train_edges = edge_index[:, train_idx]
+        train_edge_types = edge_types[train_idx]
+        test_edges = edge_index[:, test_idx]
+        test_edge_types = edge_types[test_idx]
+        
+        print(f"Train edges: {len(train_idx)}, Test edges: {len(test_idx)}")
+        
+        # Initialize fresh model for this fold
+        model = RGCNLinkPrediction(num_nodes, num_relations, hidden_dim).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+        criterion = torch.nn.BCEWithLogitsLoss()
+        
+        # Train on training edges only
+        print("Training model...")
+        for epoch in range(1, epochs + 1):
+            model.train()
+            optimizer.zero_grad()
+            
+            # Get node embeddings using ONLY training edges
+            z = model.encode(train_edges.to(device), train_edge_types.to(device))
+            
+            # Positive samples (training edges)
+            pos_out = model.decode(z, train_edges.to(device), train_edge_types.to(device))
+            pos_loss = criterion(pos_out, torch.ones_like(pos_out))
+            
+            # Negative sampling - corrupt destination nodes
+            neg_dst = torch.randint(0, num_nodes, (train_edges.size(1),), device=device)
+            neg_edge_index = torch.stack([train_edges[0].to(device), neg_dst], dim=0)
+            neg_out = model.decode(z, neg_edge_index, train_edge_types.to(device))
+            neg_loss = criterion(neg_out, torch.zeros_like(neg_out))
+            
+            # Total loss
+            loss = pos_loss + neg_loss
+            loss.backward()
+            optimizer.step()
+            
+            if epoch % 20 == 0 or epoch == 1:
+                print(f"  Epoch {epoch:03d}/{epochs}, Loss: {loss.item():.4f}")
+        
+        # Evaluate on test edges
+        print("Evaluating fold...")
+        fold_metrics = evaluate_link_prediction_fold(
+            model, train_edges.to(device), train_edge_types.to(device),
+            test_edges.to(device), test_edge_types.to(device), 
+            num_nodes, device
+        )
+        
+        fold_results.append(fold_metrics)
+        print(f"Fold {fold_idx + 1} Results:")
+        for metric, value in fold_metrics.items():
+            print(f"  {metric}: {value:.4f}")
+    
+    # Average results across folds
+    avg_results = {}
+    for metric in fold_results[0].keys():
+        avg_results[metric] = np.mean([fold[metric] for fold in fold_results])
+        avg_results[f"{metric}_std"] = np.std([fold[metric] for fold in fold_results])
+    
+    return avg_results, fold_results
+
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="Run R-GCN link prediction on a graphml file")
     argparser.add_argument("--graphml_file", type=str, required=True, help="Path to the input graphml file")
@@ -366,96 +446,16 @@ if __name__ == "__main__":
             rel_name = [r_idx]
             print(f"[{rel_name}] -> {t_name} | Score: {prob:.4f}")
 
-def five_fold_cross_validation(edge_index, edge_types, num_nodes, num_relations, device, hidden_dim=64, epochs=100):
-    """
-    Perform 5-fold cross validation on edge prediction.
-    """
-    from sklearn.model_selection import KFold
-    import torch
-    
-    # Convert to numpy for sklearn KFold
-    num_edges = edge_index.size(1)
-    edge_indices = np.arange(num_edges)
-    
-    # Initialize KFold
-    kf = KFold(n_splits=5, shuffle=True, random_state=42)
-    
-    fold_results = []
-    
-    for fold_idx, (train_idx, test_idx) in enumerate(kf.split(edge_indices)):
-        print(f"\n=== FOLD {fold_idx + 1}/5 ===")
-        
-        # Split edges into train/test for this fold
-        train_edges = edge_index[:, train_idx]
-        train_edge_types = edge_types[train_idx]
-        test_edges = edge_index[:, test_idx]
-        test_edge_types = edge_types[test_idx]
-        
-        print(f"Train edges: {len(train_idx)}, Test edges: {len(test_idx)}")
-        
-        # Initialize fresh model for this fold
-        model = RGCNLinkPrediction(num_nodes, num_relations, hidden_dim).to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
-        criterion = torch.nn.BCEWithLogitsLoss()
-        
-        # Train on training edges only
-        print("Training model...")
-        for epoch in range(1, epochs + 1):
-            model.train()
-            optimizer.zero_grad()
-            
-            # Get node embeddings using ONLY training edges
-            z = model.encode(train_edges.to(device), train_edge_types.to(device))
-            
-            # Positive samples (training edges)
-            pos_out = model.decode(z, train_edges.to(device), train_edge_types.to(device))
-            pos_loss = criterion(pos_out, torch.ones_like(pos_out))
-            
-            # Negative sampling - corrupt destination nodes
-            neg_dst = torch.randint(0, num_nodes, (train_edges.size(1),), device=device)
-            neg_edge_index = torch.stack([train_edges[0].to(device), neg_dst], dim=0)
-            neg_out = model.decode(z, neg_edge_index, train_edge_types.to(device))
-            neg_loss = criterion(neg_out, torch.zeros_like(neg_out))
-            
-            # Total loss
-            loss = pos_loss + neg_loss
-            loss.backward()
-            optimizer.step()
-            
-            if epoch % 20 == 0 or epoch == 1:
-                print(f"  Epoch {epoch:03d}/{epochs}, Loss: {loss.item():.4f}")
-        
-        # Evaluate on test edges
-        print("Evaluating fold...")
-        fold_metrics = evaluate_link_prediction_fold(
-            model, train_edges.to(device), train_edge_types.to(device),
-            test_edges.to(device), test_edge_types.to(device), 
-            num_nodes, device
-        )
-        
-        fold_results.append(fold_metrics)
-        print(f"Fold {fold_idx + 1} Results:")
-        for metric, value in fold_metrics.items():
-            print(f"  {metric}: {value:.4f}")
-    
-    # Average results across folds
-    avg_results = {}
-    for metric in fold_results[0].keys():
-        avg_results[metric] = np.mean([fold[metric] for fold in fold_results])
-        avg_results[f"{metric}_std"] = np.std([fold[metric] for fold in fold_results])
-    
-    return avg_results, fold_results
+    # Replace the training section with cross validation
+    print("Starting 5-fold cross validation...")
+    avg_results, fold_results = five_fold_cross_validation(
+        edge_index, edge_types, num_nodes, num_relations, device, 
+        hidden_dim=64, epochs=args.epochs
+    )
 
-# Replace the training section with cross validation
-print("Starting 5-fold cross validation...")
-avg_results, fold_results = five_fold_cross_validation(
-    edge_index, edge_types, num_nodes, num_relations, device, 
-    hidden_dim=64, epochs=args.epochs
-)
-
-print(f"\n=== 5-FOLD CROSS VALIDATION RESULTS ===")
-for metric, value in avg_results.items():
-    if not metric.endswith('_std'):
-        std_key = f"{metric}_std"
-        std_val = avg_results.get(std_key, 0)
-        print(f"{metric}: {value:.4f} ± {std_val:.4f}")
+    print(f"\n=== 5-FOLD CROSS VALIDATION RESULTS ===")
+    for metric, value in avg_results.items():
+        if not metric.endswith('_std'):
+            std_key = f"{metric}_std"
+            std_val = avg_results.get(std_key, 0)
+            print(f"{metric}: {value:.4f} ± {std_val:.4f}")
