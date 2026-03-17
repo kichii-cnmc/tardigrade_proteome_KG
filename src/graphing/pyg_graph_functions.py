@@ -109,11 +109,11 @@ def evaluate_link_prediction_fold(model, train_edge_index, train_edge_types,
         z = model.encode(train_edge_index, train_edge_types)
     
     # Evaluation metrics storage
-    mrr_scores = []
-    hits_at_1 = []
-    hits_at_10 = []
-    all_scores = []
-    all_labels = []
+    mrr_scores = [] # mrr = 1/rank, where rank is the position of the true edge in the sorted list of scores
+    hits_at_1 = [] # hits@1 = 1 if the true edge is ranked 1st, else 0
+    hits_at_10 = [] # hits@10 = 1 if the true edge is ranked in the top 10, else 0
+    all_scores = [] # Store scores for AUC calculation
+    all_labels = [] # Store labels for AUC calculation (1 for true edge, 0 for others)
     
     num_test = test_edge_index.size(1)
     print(f"Evaluating {num_test} test edges...")
