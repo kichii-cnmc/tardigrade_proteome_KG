@@ -338,6 +338,16 @@ if __name__ == "__main__":
     argparser.add_argument("--epochs", type=int, default=100, help="Number of training epochs")
     args = argparser.parse_args()
 
+    # load graph as igraph object
+    # initilize as PyG graph
+    # evaluate graph for basic checks (number of nodes, edges, types)
+    # initialize model, optimizer, and loss function
+    # five-fold cross validation for link prediction
+    # output evaluation metrics (MRR, Hits@1, Hits@10, AUC) & select best model
+    # use model to predict edges into graph for query nodes, filter for non-existing edges and correct node-edge-node types
+    # based on new graph w predicted edges, identify highest proximity/correlation nodes to query nodes
+    # output relationship between query nodes and top predicted nodes (e.g., shared neighbors, path lengths, etc.) to provide interpretability for predictions
+
     print("Loading graph...")
     g = ig.Graph.Read_GraphML(args.graphml_file)
     
