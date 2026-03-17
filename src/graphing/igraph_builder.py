@@ -196,6 +196,7 @@ class IGraphBuilder:
     def evaluate_graph(self):
         '''Evaluate the graph by printing basic statistics.'''
         print(f"Number of nodes: {self.graph.vcount()}")
+        print(f"Number of Protein Nodes: {len(self.graph.vs.select(node_type='Protein'))}")
         print(f"Number of edges: {self.graph.ecount()}")
         print(f"Graph density: {self.graph.density():.4f}")
         print(f"Average degree: {sum(self.graph.degree()) / self.graph.vcount():.2f}")
