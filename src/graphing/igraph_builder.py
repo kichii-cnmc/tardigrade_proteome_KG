@@ -418,7 +418,6 @@ class IGraphBuilder:
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="Build a graph from TSV files using igraph.")
     argparser.add_argument("tsv_folder", type=str, help="Path to the folder containing TSV files.")
-    argparser.add_argument("output_graph", type=str, help="Path to save the output graph JSON file.")
     argparser.add_argument("--selection_percentage", type=float, default=100, help="Percentage of rows to select from each TSV file (default: 100).")
     args = argparser.parse_args()
 
@@ -437,7 +436,7 @@ if __name__ == "__main__":
         print(relation)
     print()
     graph_builder.visualize_graph(graph_builder.sample_representative_subgraph(k = 4), "graph_visualization.png")
-    graph_builder.visualize_graph(graph_builder.sample_node_subgraph("A0A1D1V419"), "A0A1D1VV69_subgraph.png")
-    graph_builder.output_triples("graph_triples.tsv")
-    graph_builder.output_nodes("graph_nodes.tsv")
+    # graph_builder.visualize_graph(graph_builder.sample_node_subgraph("A0A1D1V419"), "A0A1D1VV69_subgraph.png")
+    # graph_builder.output_triples("graph_triples.tsv")
+    # graph_builder.output_nodes("graph_nodes.tsv")
     graph_builder.save_graphml("graph.graphml")
