@@ -2,6 +2,7 @@ name: tardigrade_proteome_KG_env
 channels:
 - conda-forge
 - bioconda
+- pyg
 - nodefaults
 dependencies:
 - aiofiles
@@ -15,6 +16,7 @@ dependencies:
 - pandas
 - pip
 - pycairo
+- pyg
 - python=3.12
 - python-igraph
 - pytorch
@@ -24,6 +26,4 @@ dependencies:
 - scipy
 - setuptools
 - transformers
-pip:
-- pykeen
 
