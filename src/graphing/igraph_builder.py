@@ -2,6 +2,8 @@
 import igraph as ig
 import os
 import json
+from networkx import subgraph
+from networkx import subgraph
 import pandas as pd
 import glob
 import argparse
@@ -294,11 +296,12 @@ class IGraphBuilder:
             'has_molecular_function': '#DD8452',
             'located_in_cellular_component': '#55A868',
             'involved_in_biological_process': '#C44E52',
-            'has_pfam_domain': '#8172B2',
+            'has_pfam_domain': "#DE14AB",
             'in_kegg_pathway': '#937860',
             'has_prosite_annotation': '#DA8BC3',
             'interacts_with': '#7B4173',
             'embeddings_similar_to': "#2D00E1",
+            'predicted_relation': "#8C8C8C",
             None: '#CCCCCC',
         }
         # Find the indices of vertices with a degree of 0
@@ -353,6 +356,17 @@ class IGraphBuilder:
 
         neighbors = self.graph.neighbors(node_id, mode="all")
         subgraph = self.graph.subgraph([node_id] + neighbors)
+        return subgraph
+
+    def sample_node_set_subgraph(self, node_names):
+        '''Returns a subgraph containing only the specified nodes and all their edges.'''
+        node_ids = [self.identify_node(name) for name in node_names]
+        if None in node_ids:
+            print(f"Cannot visualize graph for '{node_names}' because one or more nodes do not exist.")
+            return
+
+        subgraph = self.graph.subgraph(node_ids)
+
         return subgraph
 
     def output_triples(self, output_path):
@@ -431,12 +445,39 @@ if __name__ == "__main__":
     graph_builder.filter_nodes_by_degree(min_degree=1)  # Example threshold, adjust as needed
     graph_builder.evaluate_graph()
     print()
-    node_relations = graph_builder.get_node_relations("A0A1D1V419")  # Example node name, adjust as needed
+    node_relations = graph_builder.get_node_relations("P0DOW4")  # Example node name, adjust as needed
     for relation in node_relations:
         print(relation)
     print()
     graph_builder.visualize_graph(graph_builder.sample_representative_subgraph(k = 4), "graph_visualization.png")
-    # graph_builder.visualize_graph(graph_builder.sample_node_subgraph("A0A1D1V419"), "A0A1D1VV69_subgraph.png")
-    # graph_builder.output_triples("graph_triples.tsv")
-    # graph_builder.output_nodes("graph_nodes.tsv")
+
+    predicted_graph = ig.Graph.Read_GraphML("graph_with_predictions.graphml")
+
+    # def get_node_identifier(v):
+    #     if "name" in v.attributes():
+    #         return v["name"]
+    #     elif "id" in v.attributes():
+    #         return v["id"]
+    #     return str(v.index)
+
+    # for edge in predicted_graph.es:
+    #     source = get_node_identifier(predicted_graph.vs[edge.source])
+    #     target = get_node_identifier(predicted_graph.vs[edge.target])
+    #     weight = edge["weight"] if "weight" in edge.attributes() else 1
+
+    #     if not graph_builder.graph.are_connected(source, target):
+    #         graph_builder.add_edge(source, target,
+    #                             edge_type="predicted_relation",
+    #                             weight=weight)
+    # predicted_edges = graph_builder.graph.es.select(edge_type="predicted_relation")
+    # print(f"Number of predicted edges: {len(predicted_edges)}")
+
+    # node_set = ["P0DOW4", "GO:0003677","A0A1W0X8K9", "GO:0042594",
+    #             "GO:0009267", "GO:0016036", "GO:0006817", "GO:0110165"]
+
+    # graph_builder.visualize_graph(
+    #     graph_builder.sample_node_set_subgraph(node_set),
+    #     "node_set_subgraph.png"
+    # )
+
     graph_builder.save_graphml("graph.graphml")

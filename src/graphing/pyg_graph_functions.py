@@ -5,6 +5,7 @@ import numpy as np
 import argparse
 from torch_geometric.nn import RGCNConv
 from sklearn.metrics import roc_auc_score
+from collections import Counter
 
 def evaluate_link_prediction(model, edge_index, edge_types, num_nodes, device, test_ratio=0.2):
     """
@@ -663,6 +664,9 @@ if __name__ == "__main__":
 
     # evaluate graph for basic checks (number of nodes, edges, types)
     print(f"Edge Types: {edge_type_map}")
+    # count the number of each edge type
+    edge_type_counts = Counter(g.es["edge_type"])
+    print(f"Edge type counts: {edge_type_counts}")
     num_nodes = g.vcount()
     num_relations = int(edge_types.max().item() + 1)
         # check if graph has node names for mapping
@@ -670,7 +674,6 @@ if __name__ == "__main__":
     print(f"Graph loaded: {num_nodes} nodes, {g.ecount()} edges, {num_relations} relations.")
 
     # node type check
-    from collections import Counter
     node_types = g.vs["node_type"] if "node_type" in g.vs.attributes() else []
     print(Counter(node_types))
 
@@ -755,3 +758,6 @@ if __name__ == "__main__":
 
     # output interpretability analysis results (e.g., shared neighbors, path lengths) for top predicted nodes to provide insights into why those nodes are proximal to query nodes
     interpret_proximity(g, query_node_indices, proximal_nodes)
+
+    # save graph with predictions as new graphml file
+    g.write_graphml("graph_with_predictions.graphml")
